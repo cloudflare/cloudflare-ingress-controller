@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudflare-warp
+data:
+  cert.pem: |
+    -----BEGIN PRIVATE KEY-----
+    [ private key here ]
+    -----END PRIVATE KEY-----
+    -----BEGIN CERTIFICATE-----
+    [ certificate here ]
+    -----END CERTIFICATE-----
+    -----BEGIN WARP TOKEN-----
+    [ warp token here ]
+    -----END WARP TOKEN-----

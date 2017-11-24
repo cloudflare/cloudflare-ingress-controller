@@ -1,0 +1,50 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: null
+  generation: 1
+  labels:
+    run: warp-controller
+  name: warp-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      run: warp-controller
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: warp-controller
+    spec:
+      containers:
+      - command:
+        - /warp-controller
+        - -v=6
+        image: quay.io/stackpoint/warp-controller:e9dc097-dirty
+        imagePullPolicy: IfNotPresent
+        name: warp-controller
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - name: cloudflare-warp-cert
+          mountPath: /etc/cloudflare-warp
+      imagePullSecrets:
+      - name: stackpoint-spck8sbot-pull-secret
+      volumes:
+        - name: cloudflare-warp-cert
+          configMap:
+            name: cloudflare-warp
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30

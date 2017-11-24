@@ -1,0 +1,12 @@
+# Copyright 2017 
+#
+# [ Insert license information here ]
+
+FROM ARG_FROM
+
+MAINTAINER Nate Franzen <nate@stackpointcloud.com>
+
+ADD bin/ARG_ARCH/ARG_BIN /ARG_BIN
+
+USER nobody:nobody
+ENTRYPOINT ["/ARG_BIN"]

@@ -35,7 +35,7 @@ import (
 	lister_v1 "k8s.io/client-go/listers/core/v1"
 	lister_v1beta1 "k8s.io/client-go/listers/extensions/v1beta1"
 
-	"github.com/StackPointCloud/cloudflare-warp-ingress/pkg/tunnel"
+	"github.com/cloudflare/cloudflare-warp-ingress/pkg/tunnel"
 )
 
 const maxRetries = 5

@@ -16,7 +16,7 @@
 BIN := warp-controller
 
 # This repo's root import path (under GOPATH).
-PKG := github.com/StackPointCloud/cloudflare-warp-ingress
+PKG := github.com/cloudflare/cloudflare-warp-ingress
 
 # Where to push the docker image.
 REGISTRY ?= quay.io/stackpoint

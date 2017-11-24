@@ -7,7 +7,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/StackPointCloud/cloudflare-warp-ingress/pkg/controller"
+	"github.com/cloudflare/cloudflare-warp-ingress/pkg/controller"
 	"github.com/golang/glog"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"

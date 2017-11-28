@@ -2,12 +2,14 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/cloudflare/cloudflare-warp-ingress/pkg/controller"
+	"github.com/cloudflare/cloudflare-warp-ingress/pkg/version"
 	"github.com/golang/glog"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -18,9 +20,15 @@ func main() {
 
 	kubeconfig := flag.String("kubeconfig", "", "Path to a kubeconfig file")
 	namespace := flag.String("namespace", "default", "Namespace to run in")
+	v := flag.Bool("version", false, "prints application version")
 
 	flag.Set("logtostderr", "true")
 	flag.Parse()
+
+	if *v {
+		fmt.Printf("%s %s\n", version.APP_NAME, version.VERSION)
+		os.Exit(0)
+	}
 
 	var client *kubernetes.Clientset
 	var config *rest.Config

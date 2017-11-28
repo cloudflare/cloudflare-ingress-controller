@@ -24,10 +24,10 @@ REGISTRY ?= quay.io/stackpoint
 # Which architecture to build - see $(ALL_ARCH) for options.
 ARCH ?= amd64
 
-# This version-strategy uses git tags to set the version string
-VERSION := $(shell git describe --tags --always --dirty)
-#
-# This version-strategy uses a manual value to set the version string
+# This version-strategy if not set externally
+# use git tags to set the version string
+VERSION ?= $(shell git describe --tags --always --dirty)
+# use a manual value to set the version string
 #VERSION := 1.2.3
 
 ###
@@ -54,8 +54,7 @@ endif
 
 IMAGE := $(REGISTRY)/$(BIN)
 
-BUILD_IMAGE ?= golang-dep
-
+BUILD_IMAGE ?= golang:1.9-stretch
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-container' rule.
 # If you want to build AND push all containers, see the 'all-push' rule.
@@ -94,6 +93,7 @@ bin/$(ARCH)/$(BIN): build-dirs
 	        ARCH=$(ARCH)                                                    \
 	        VERSION=$(VERSION)                                              \
 	        PKG=$(PKG)                                                      \
+	        BIN=$(BIN)                                                      \
 	        ./build/build.sh                                                \
 	    "
 	@docker run                                                             \

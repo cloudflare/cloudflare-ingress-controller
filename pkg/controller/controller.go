@@ -97,7 +97,7 @@ func createIngressInformer(client kubernetes.Interface, namespace string) (cache
 		&v1beta1.Ingress{},
 
 		// The resync period of this object.
-		15*time.Second,
+		60*time.Second,
 
 		// Callback Functions to trigger on add/update/delete
 		cache.ResourceEventHandlerFuncs{
@@ -170,7 +170,7 @@ func (w *WarpController) configureServiceInformer() {
 		&v1.Service{},
 
 		// The resync period of this object.
-		15*time.Second,
+		60*time.Second,
 
 		// Callback Functions to trigger on add/update/delete
 		cache.ResourceEventHandlerFuncs{
@@ -237,7 +237,7 @@ func (w *WarpController) configureEndpointInformer() {
 		&v1.Endpoints{},
 
 		// The resync period of this object.
-		15*time.Second,
+		60*time.Second,
 
 		// Queue all these changes as an update to the service
 		cache.ResourceEventHandlerFuncs{

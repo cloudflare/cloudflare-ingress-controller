@@ -3,17 +3,56 @@
 Implements an ingress controller using cloudflare-warp tunnel
 to connect a cloudflare-managed url to a kubernetes service.
 
+## Deployment
+
+The warp controller will manage ingress tunnels in a single
+namespace of the cluster.  Multiple controllers can exist
+in different namespaces, with different credentials for
+each namespace.
+
+#### Cloudflare certificate
+
+The _cert.pem_ file must be available to the controller as a secret,
+and must be configured in the cluster before the controller can start.
+
+```
+kubectl --namespace=$NAMESPACE create secret generic \
+   cloudflare-warp-cert \
+   --from-file=${HOME}/.cloudflare-warp/cert.pem
+```
+
+#### Warp controller deployment
+
+```
+kubectl --namespace=$NAMESPACE create -f deploy/cloudflare-serviceaccount.yaml
+kubectl --namespace=$NAMESPACE create -f deploy/warp-controller-deployment.yaml
+```
+
+#### RBAC configuration
+
+If your cluster has rbac enabled, then the warp controller must be configured
+with sufficient rights to observe ingresses, services and endpoints.
+
+```
+kubectl --namespace=$NAMESPACE create -f deploy/cloudflare-warp-role.yaml
+kubectl --namespace=$NAMESPACE create -f deploy/cloudflare-warp-rolebinding.yaml
+```
+
+#### Ingress deployment
+
+An example of an ingress is found at _deploy/nginx-ingress.yaml_
+
 ## Configuration
 
 #### Cloudflare credentials
 
-The cloudflare _cert.pem_ file is inserted wholly into a configmap and
+The cloudflare _cert.pem_ file is saved as a kubernetes secret and
 mounted as a file into the pod that creates the tunnel.
 
 #### Ingress configuration
 
 The ingress must have the annotation
-_kubernetes.io/ingress.class: cloudflare-warp_ in order to be managed
+_kubernetes.io<span>/</span>ingress.class: cloudflare-warp_ in order to be managed
 by the warp controller.
 
 ## Design
@@ -67,6 +106,6 @@ This process should retrieve all the necessary dependencies, build the binary, a
 package it as a docker image.  Given that some of the github repositories are private,
 there may or may not be issues retrieving the code. In order to run the application in
 a kubernetes cluster, the image must be pushed to a repository.  It is currently
-being pushed to a private quay.io, and this can be changed editing the references in
+being pushed to a quay<span>.</span>io repository, and this can be changed editing the references in
 the Makefile and in the _deploy_ manifest.
 

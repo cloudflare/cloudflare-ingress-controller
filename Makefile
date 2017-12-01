@@ -54,7 +54,7 @@ endif
 
 IMAGE := $(REGISTRY)/$(BIN)
 
-BUILD_IMAGE ?= golang:1.9-stretch
+BUILD_IMAGE ?= golang:1.9-alpine
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-container' rule.
 # If you want to build AND push all containers, see the 'all-push' rule.

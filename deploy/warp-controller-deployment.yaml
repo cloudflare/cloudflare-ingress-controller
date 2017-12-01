@@ -28,7 +28,7 @@ spec:
       - command:
         - /warp-controller
         - -v=6
-        image: quay.io/stackpoint/warp-controller:e9dc097-dirty
+        image: quay.io/stackpoint/warp-controller:0.2.0
         imagePullPolicy: IfNotPresent
         name: warp-controller
         resources: {}
@@ -41,10 +41,12 @@ spec:
       - name: stackpoint-spck8sbot-pull-secret
       volumes:
         - name: cloudflare-warp-cert
-          configMap:
-            name: cloudflare-warp
+          secret:
+            secretName: cloudflare-warp-cert
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
       securityContext: {}
+      serviceAccount: cloudflare-warp
+      serviceAccountName: cloudflare-warp
       terminationGracePeriodSeconds: 30

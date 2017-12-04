@@ -28,6 +28,8 @@ const maxRetries = 5
 type WarpController struct {
 	client kubernetes.Interface
 
+	metricsConfig *tunnel.MetricsConfig
+
 	ingressLister    lister_v1beta1.IngressLister
 	ingressInformer  cache.Controller
 	ingressWorkqueue workqueue.RateLimitingInterface
@@ -48,8 +50,12 @@ func NewWarpController(client kubernetes.Interface, namespace string) *WarpContr
 	informer, indexer, queue := createIngressInformer(client, namespace)
 	tunnels := make(map[string]tunnel.Tunnel, 0)
 
+	metricsConfig := tunnel.NewMetrics()
+
 	w := &WarpController{
 		client: client,
+
+		metricsConfig: metricsConfig,
 
 		ingressInformer:  informer,
 		ingressWorkqueue: queue,
@@ -507,7 +513,7 @@ func (w *WarpController) createTunnel(ingress *v1beta1.Ingress) error {
 	}
 
 	// tunnel, err := tunnel.NewTunnelPodManager(w.client, config)
-	tunnel, err := tunnel.NewWarpManager(config)
+	tunnel, err := tunnel.NewWarpManager(config, w.metricsConfig)
 
 	if err != nil {
 		return err

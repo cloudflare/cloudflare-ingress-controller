@@ -98,6 +98,9 @@ func (mgr *WarpManager) Start() error {
 }
 
 func (mgr *WarpManager) Stop() error {
+	if mgr.stopCh == nil {
+		return fmt.Errorf("tunnel %s already stopped", mgr.id)
+	}
 	close(mgr.stopCh)
 	mgr.stopCh = nil
 	return <-mgr.errCh

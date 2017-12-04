@@ -1,19 +1,3 @@
-/*
-Copyright 2016 Skippbox, Ltd.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package controller
 
 import (
@@ -102,27 +86,19 @@ func createIngressInformer(client kubernetes.Interface, namespace string) (cache
 		// Callback Functions to trigger on add/update/delete
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				if !shouldHandleIngress(obj) {
-					return
-				}
-				if key, err := cache.MetaNamespaceKeyFunc(obj); err == nil {
+				if key, ok := shouldHandleIngress(obj); ok {
 					queue.Add("add:" + key)
 				}
 			},
 			UpdateFunc: func(old, new interface{}) {
-				if shouldHandleIngress(old) || shouldHandleIngress(new) {
-					if key, err := cache.MetaNamespaceKeyFunc(new); err == nil {
-						queue.Add("update:" + key)
-					}
+				if key, ok := shouldHandleIngress(old); ok {
+					queue.Add("update:" + key)
 				} else {
 					return
 				}
 			},
 			DeleteFunc: func(obj interface{}) {
-				if !shouldHandleIngress(obj) {
-					return
-				}
-				if key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj); err == nil {
+				if key, ok := shouldHandleIngress(obj); ok {
 					queue.Add("delete:" + key)
 				}
 			},
@@ -132,25 +108,38 @@ func createIngressInformer(client kubernetes.Interface, namespace string) (cache
 	return informer, indexer, queue
 }
 
-// check the type and the annotation before enqueueing
-func shouldHandleIngress(obj interface{}) bool {
+// check the type, annotation and conditions.  Return key, ok
+// key is: ingressname+"/"+servicename
+// allows lookup by either the ingress name or the service name
+func shouldHandleIngress(obj interface{}) (string, bool) {
 	var ingressClassKey = "kubernetes.io/ingress.class"
 
 	ingress, ok := obj.(*v1beta1.Ingress)
 	if !ok {
 		glog.V(5).Infof("Object is not an ingress, don't handle")
-		return false
+		return "", false
 	}
 	val, ok := ingress.Annotations[ingressClassKey]
 	if !ok {
 		glog.V(5).Infof("No annotation found for %s", ingressClassKey)
-		return false
+		return "", false
 	}
 	glog.V(5).Infof("Annotation %s=%s", ingressClassKey, val)
 	if val != "cloudflare-warp" {
-		return false
+		return "", false
 	}
-	return true
+
+	rules := ingress.Spec.Rules
+	if len(rules) > 1 {
+		glog.V(2).Infof("Cannot create tunnel for ingress with multiple rules")
+		return "", false
+	}
+	paths := rules[0].HTTP.Paths
+	if len(paths) > 1 {
+		glog.V(2).Infof("Cannot create tunnel for ingress with multiple paths")
+		return "", false
+	}
+	return fmt.Sprintf("%s/%s", ingress.ObjectMeta.Name, ingress.Spec.Rules[0].HTTP.Paths[0].Backend.ServiceName), true
 }
 
 func (w *WarpController) configureServiceInformer() {
@@ -179,27 +168,21 @@ func (w *WarpController) configureServiceInformer() {
 				if !ok || !w.isWatchedService(svc) {
 					return
 				}
-				if key, err := cache.MetaNamespaceKeyFunc(obj); err == nil {
-					queue.Add("add:" + key)
-				}
+				queue.Add("add:" + svc.ObjectMeta.Name)
 			},
 			UpdateFunc: func(old, new interface{}) {
 				svc, ok := new.(*v1.Service)
 				if !ok || !w.isWatchedService(svc) {
 					return
 				}
-				if key, err := cache.MetaNamespaceKeyFunc(new); err == nil {
-					queue.Add("update:" + key)
-				}
+				queue.Add("update:" + svc.ObjectMeta.Name)
 			},
 			DeleteFunc: func(obj interface{}) {
 				svc, ok := obj.(*v1.Service)
 				if !ok || !w.isWatchedService(svc) {
 					return
 				}
-				if key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj); err == nil {
-					queue.Add("delete:" + key)
-				}
+				queue.Add("delete:" + svc.ObjectMeta.Name)
 			},
 		},
 		cache.Indexers{},
@@ -239,34 +222,28 @@ func (w *WarpController) configureEndpointInformer() {
 		// The resync period of this object.
 		60*time.Second,
 
-		// Queue all these changes as an update to the service
+		// Queue all these changes as an update to the service using the endpoint name == service name
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				ep, ok := obj.(*v1.Endpoints)
 				if !ok || !w.isWatchedEndpoint(ep) {
 					return
 				}
-				if key, err := cache.MetaNamespaceKeyFunc(obj); err == nil {
-					w.serviceWorkqueue.Add("update:" + key)
-				}
+				w.serviceWorkqueue.Add("update:" + ep.ObjectMeta.Name)
 			},
 			UpdateFunc: func(old, new interface{}) {
 				ep, ok := new.(*v1.Endpoints)
 				if !ok || !w.isWatchedEndpoint(ep) {
 					return
 				}
-				if key, err := cache.MetaNamespaceKeyFunc(new); err == nil {
-					w.serviceWorkqueue.Add("update:" + key)
-				}
+				w.serviceWorkqueue.Add("update:" + ep.ObjectMeta.Name)
 			},
 			DeleteFunc: func(obj interface{}) {
 				ep, ok := obj.(*v1.Endpoints)
 				if !ok || !w.isWatchedEndpoint(ep) {
 					return
 				}
-				if key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj); err == nil {
-					w.serviceWorkqueue.Add("update:" + key)
-				}
+				w.serviceWorkqueue.Add("update:" + ep.ObjectMeta.Name)
 			},
 		},
 		cache.Indexers{},
@@ -336,67 +313,57 @@ func (w *WarpController) processNextIngress() bool {
 	return true
 }
 
-func (w *WarpController) processIngress(queueKey string) error {
-
-	var key, op, name string
+func parseIngressKey(queueKey string) (string, string, string) {
 
 	identifiers := strings.SplitN(queueKey, ":", 2)
-	op = identifiers[0]
-	key = identifiers[1]
+	op := identifiers[0]
+	key := identifiers[1]
 
 	identifiers = strings.SplitN(key, "/", 2)
-	if len(identifiers) == 1 {
-		// namespace = ""
-		name = identifiers[0]
-	} else if len(identifiers) == 2 {
-		// namespace = identifiers[0]
-		name = identifiers[1]
-	}
+	ingressname := identifiers[0]
+	servicename := identifiers[1]
+
+	return op, ingressname, servicename
+}
+
+func (w *WarpController) processIngress(queueKey string) error {
+
+	op, servicename, ingressname := parseIngressKey(queueKey)
 
 	switch op {
 
 	case "add":
 
-		tunnel := w.tunnels[key]
+		ingress, err := w.ingressLister.Ingresses(w.namespace).Get(ingressname)
+		tunnel := w.tunnels[servicename]
 		if tunnel != nil {
-			glog.V(4).Infof("Tunnel \"%s\" (%s) already exists", key, tunnel.Config().ExternalHostname)
+			glog.V(4).Infof("Tunnel \"%s\" (%s) already exists", servicename, tunnel.Config().ExternalHostname)
 			// return tunnel.CheckStatus()
 			return nil
 		}
-		ingress, err := w.ingressLister.Ingresses(w.namespace).Get(name)
 		if err != nil {
-			return fmt.Errorf("failed to retrieve ingress by key %q: %v", key, err)
+			return fmt.Errorf("failed to retrieve ingress by name %q: %v", ingressname, err)
 		}
 
-		return w.createTunnel(ingress, key)
+		return w.createTunnel(ingress)
 
 	case "delete":
 
-		if w.tunnels[key] == nil {
-			glog.V(4).Infof("Cannot tear down non-existent tunnel \"%s\"", key)
-			return nil
-		}
-
-		err := w.tunnels[key].Stop()
-		if err != nil {
-			return err
-		}
-		delete(w.tunnels, key)
-		return nil
+		return w.removeTunnel(servicename)
 
 	case "update":
 		// Not clear how much work we should put into watching the running state of the tunnel so
 		// lets just do CheckStatus here every time we see an ingress update
-		tunnel := w.tunnels[key]
+		tunnel := w.tunnels[servicename]
 
 		if tunnel == nil {
-			glog.V(4).Infof("Ingress %s is missing a tunnel, creating now", key)
+			glog.V(4).Infof("Ingress %s is missing a tunnel, creating now", servicename)
 
-			ingress, err := w.ingressLister.Ingresses(w.namespace).Get(name)
+			ingress, err := w.ingressLister.Ingresses(w.namespace).Get(ingressname)
 			if err != nil {
-				return fmt.Errorf("failed to retrieve ingress by key %q: %v", key, err)
+				return fmt.Errorf("failed to retrieve ingress by key %q: %v", ingressname, err)
 			}
-			return w.createTunnel(ingress, key)
+			return w.createTunnel(ingress)
 		}
 
 		// return tunnel.CheckStatus()
@@ -500,27 +467,42 @@ func handleErr(err error, key interface{}, queue workqueue.RateLimitingInterface
 	glog.Errorf("Dropping object %q out of the queue: %v", key, err)
 }
 
-func (w *WarpController) createTunnel(ingress *v1beta1.Ingress, key string) error {
-
-	glog.V(4).Infof("creating tunnel for ingress %s, key %s", ingress.GetName(), key)
-
+// returns non-nil error if the ingress is not something we can deal with
+func (w *WarpController) validateIngress(ingress *v1beta1.Ingress) error {
 	rules := ingress.Spec.Rules
 	if len(rules) > 1 {
 		return fmt.Errorf("Cannot create tunnel for ingress with multiple rules")
 	}
-	hostname := rules[0].Host
 	paths := rules[0].HTTP.Paths
 	if len(paths) > 1 {
 		return fmt.Errorf("Cannot create tunnel for ingress with multiple paths")
 	}
-	servicename := paths[0].Backend.ServiceName
-	// paths[0].Backend.ServicePort will be needed if we use Endpoints instead
+	return nil
+}
 
+// assumes validation
+func (w *WarpController) getServiceNameForIngress(ingress *v1beta1.Ingress) string {
+	return ingress.Spec.Rules[0].HTTP.Paths[0].Backend.ServiceName
+}
+
+// assumes validation
+func (w *WarpController) getHostNameForIngress(ingress *v1beta1.Ingress) string {
+	return ingress.Spec.Rules[0].Host
+}
+
+// creates a tunnel and stores a reference to it by servicename
+func (w *WarpController) createTunnel(ingress *v1beta1.Ingress) error {
+	err := w.validateIngress(ingress)
+	if err != nil {
+		return err
+	}
+	glog.V(4).Infof("creating tunnel for ingress %s", ingress.GetName())
+	servicename := w.getServiceNameForIngress(ingress)
 	configMapName := "cloudflare-warp" // make configurable to support multiple users in a namespace
 	config := &tunnel.Config{
 		ServiceName:      servicename,
 		Namespace:        w.namespace,
-		ExternalHostname: hostname,
+		ExternalHostname: w.getHostNameForIngress(ingress),
 		CertificateName:  configMapName,
 	}
 
@@ -530,22 +512,22 @@ func (w *WarpController) createTunnel(ingress *v1beta1.Ingress, key string) erro
 	if err != nil {
 		return err
 	}
-	w.tunnels[key] = tunnel
+	w.tunnels[servicename] = tunnel
+	glog.V(4).Infof("added tunnel for ingress %s, service %s", ingress.GetName(), servicename)
 
-	return w.startOrStop(key)
+	return w.startOrStop(servicename)
 }
 
 // starts or stops the tunnel depending on the existence of
 // the associated service and endpoints
-func (w *WarpController) startOrStop(key string) error {
-	glog.V(5).Infof("Start or Stop %s", key)
+func (w *WarpController) startOrStop(servicename string) error {
+	glog.V(5).Infof("Start or Stop %s", servicename)
 
-	t := w.tunnels[key]
+	t := w.tunnels[servicename]
 	if t == nil {
-		return fmt.Errorf("Tunnel not found for key %s", key)
+		return fmt.Errorf("Tunnel not found for key %s", servicename)
 	}
-	// check service
-	servicename := t.Config().ServiceName
+
 	service, err := w.serviceLister.Services(w.namespace).Get(servicename)
 	if service == nil || err != nil {
 		glog.V(5).Infof("Service %s not found for tunnel", servicename)
@@ -569,6 +551,17 @@ func (w *WarpController) startOrStop(key string) error {
 		return t.Start()
 	}
 	return nil
+}
+
+func (w *WarpController) removeTunnel(servicename string) error {
+
+	t := w.tunnels[servicename]
+	if t == nil {
+		return fmt.Errorf("Tunnel not found for key %s", servicename)
+	}
+	err := t.Stop()
+	delete(w.tunnels, servicename)
+	return err
 }
 
 func (w *WarpController) tearDown() error {

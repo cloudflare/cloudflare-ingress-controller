@@ -7,10 +7,11 @@ import (
 	"time"
 
 	"github.com/cloudflare/cloudflare-warp-ingress/pkg/cloudflare"
-	"github.com/cloudflare/cloudflare-warp/h2mux"
 	"github.com/cloudflare/cloudflare-warp/origin"
 	tunnelpogs "github.com/cloudflare/cloudflare-warp/tunnelrpc/pogs"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+
+	log "github.com/Sirupsen/logrus"
 )
 
 const ()
@@ -41,7 +42,7 @@ type WarpManager struct {
 // }
 
 // NewWarpManager is a wrapper around a warp tunnel running in a goroutine
-func NewWarpManager(config *Config) (Tunnel, error) {
+func NewWarpManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, error) {
 
 	// path to pem file should be passed in,
 	// or here, assume that it is mounted at a particular location
@@ -51,8 +52,14 @@ func NewWarpManager(config *Config) (Tunnel, error) {
 		return nil, fmt.Errorf("Cannot read %s to load origin certificate, %v", originCertPath, err)
 	}
 
+	haConnections := 1
+
+	protocolLogger := log.WithFields(log.Fields{
+		"service": config.ServiceName,
+	}).Logger
+
 	tunnelConfig := origin.TunnelConfig{
-		EdgeAddr:          "cftunnel.com:7844",
+		EdgeAddrs:         []string{"cftunnel.com:7844"},
 		OriginUrl:         config.ServiceName,
 		Hostname:          config.ExternalHostname,
 		OriginCert:        originCert,    // []byte{}
@@ -64,7 +71,10 @@ func NewWarpManager(config *Config) (Tunnel, error) {
 		ReportedVersion:   "DEV",
 		LBPool:            "",
 		Tags:              []tunnelpogs.Tag{},
-		ConnectedSignal:   h2mux.NewSignal(),
+		HAConnections:     haConnections,
+		Metrics:           metricsSetup.Metrics,
+		MetricsUpdateFreq: metricsSetup.UpdateFrequency,
+		ProtocolLogger:    protocolLogger,
 	}
 
 	tunnelConfig.TlsConfig.RootCAs = cloudflare.GetCloudflareRootCA()
@@ -90,9 +100,11 @@ func (mgr *WarpManager) Active() bool {
 
 func (mgr *WarpManager) Start() error {
 
+	placeHolderOnlyConnectedSignal := make(chan struct{})
+
 	mgr.stopCh = make(chan struct{})
 	go func() {
-		mgr.errCh <- origin.StartTunnelDaemon(mgr.tunnelConfig, mgr.stopCh)
+		mgr.errCh <- origin.StartTunnelDaemon(mgr.tunnelConfig, mgr.stopCh, placeHolderOnlyConnectedSignal)
 	}()
 	return nil
 }

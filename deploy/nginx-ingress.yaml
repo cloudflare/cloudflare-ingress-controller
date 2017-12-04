@@ -6,7 +6,7 @@ metadata:
   name: nginx
 spec:
   rules:
-  - host: nginx.example.com
+  - host: nginx2.anthopleura.net
     http:
       paths:
       - backend:

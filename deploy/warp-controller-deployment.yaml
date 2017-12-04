@@ -28,7 +28,7 @@ spec:
       - command:
         - /warp-controller
         - -v=6
-        image: quay.io/stackpoint/warp-controller:0.2.0
+        image: quay.io/stackpoint/warp-controller:beta
         imagePullPolicy: IfNotPresent
         name: warp-controller
         resources: {}

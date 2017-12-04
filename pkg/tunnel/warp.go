@@ -94,8 +94,7 @@ func (mgr *WarpManager) Start() error {
 	go func() {
 		mgr.errCh <- origin.StartTunnelDaemon(mgr.tunnelConfig, mgr.stopCh)
 	}()
-
-	return fmt.Errorf("Not implemented")
+	return nil
 }
 
 func (mgr *WarpManager) Stop() error {

@@ -452,19 +452,13 @@ func (w *WarpController) getTunnelForService(servicename string) tunnel.Tunnel {
 
 func handleErr(err error, key interface{}, queue workqueue.RateLimitingInterface) {
 	if err == nil {
-		// Forget about the #AddRateLimited history of the key on every successful synchronization.
-		// This ensures that future processing of updates for this key is not delayed because of
-		// an outdated error history.
 		queue.Forget(key)
 		return
 	}
 
-	// This controller retries 5 times if something goes wrong...
-	if queue.NumRequeues(key) < 5 {
+	// This controller retries twice if something goes wrong...
+	if queue.NumRequeues(key) < 2 {
 		glog.Infof("Error processing %v: %v", key, err)
-
-		// Re-enqueue the key rate limited. Based on the rate limiter on the
-		// queue and the re-enqueue history, the key will be processed later again.
 		queue.AddRateLimited(key)
 		return
 	}
@@ -496,6 +490,24 @@ func (w *WarpController) getHostNameForIngress(ingress *v1beta1.Ingress) string 
 	return ingress.Spec.Rules[0].Host
 }
 
+// obtains the origin cert for a particular hostname
+func (w *WarpController) readOriginCert(hostname string) ([]byte, error) {
+	// in the future, we will have multiple secrets
+	// at present the mapping of hostname -> secretname is "*" -> "cloudflare-warp-cert"
+	secretName := "cloudflare-warp-cert"
+
+	certSecret, err := w.client.CoreV1().Secrets(w.namespace).Get(secretName, meta_v1.GetOptions{})
+	if err != nil {
+		return []byte{}, err
+	}
+	certFileName := "cert.pem"
+	originCert := certSecret.Data[certFileName]
+	if len(originCert) == 0 {
+		return []byte{}, fmt.Errorf("Certificate data not found for host %s in secret %s/%s", hostname, secretName, certFileName)
+	}
+	return originCert, nil
+}
+
 // creates a tunnel and stores a reference to it by servicename
 func (w *WarpController) createTunnel(ingress *v1beta1.Ingress) error {
 	err := w.validateIngress(ingress)
@@ -503,13 +515,18 @@ func (w *WarpController) createTunnel(ingress *v1beta1.Ingress) error {
 		return err
 	}
 	glog.V(4).Infof("creating tunnel for ingress %s", ingress.GetName())
-	servicename := w.getServiceNameForIngress(ingress)
-	configMapName := "cloudflare-warp" // make configurable to support multiple users in a namespace
+	serviceName := w.getServiceNameForIngress(ingress)
+	hostName := w.getHostNameForIngress(ingress)
+	originCert, err := w.readOriginCert(hostName)
+	if err != nil {
+		return err
+	}
+
 	config := &tunnel.Config{
-		ServiceName:      servicename,
+		ServiceName:      serviceName,
 		Namespace:        w.namespace,
-		ExternalHostname: w.getHostNameForIngress(ingress),
-		CertificateName:  configMapName,
+		ExternalHostname: hostName,
+		OriginCert:       originCert,
 	}
 
 	// tunnel, err := tunnel.NewTunnelPodManager(w.client, config)
@@ -518,10 +535,10 @@ func (w *WarpController) createTunnel(ingress *v1beta1.Ingress) error {
 	if err != nil {
 		return err
 	}
-	w.tunnels[servicename] = tunnel
-	glog.V(4).Infof("added tunnel for ingress %s, service %s", ingress.GetName(), servicename)
+	w.tunnels[serviceName] = tunnel
+	glog.V(4).Infof("added tunnel for ingress %s, service %s", ingress.GetName(), serviceName)
 
-	return w.startOrStop(servicename)
+	return w.startOrStop(serviceName)
 }
 
 // starts or stops the tunnel depending on the existence of

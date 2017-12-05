@@ -28,21 +28,14 @@ spec:
       - command:
         - /warp-controller
         - -v=6
-        image: quay.io/stackpoint/warp-controller:0.2.5
+        image: quay.io/stackpoint/warp-controller:0.2.7
         imagePullPolicy: IfNotPresent
         name: warp-controller
         resources: {}
         terminationMessagePath: /dev/termination-log
         terminationMessagePolicy: File
-        volumeMounts:
-        - name: cloudflare-warp-cert
-          mountPath: /etc/cloudflare-warp
       imagePullSecrets:
       - name: stackpoint-spck8sbot-pull-secret
-      volumes:
-        - name: cloudflare-warp-cert
-          secret:
-            secretName: cloudflare-warp-cert
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler

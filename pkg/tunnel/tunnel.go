@@ -42,7 +42,7 @@ type Config struct {
 	ServiceName      string
 	Namespace        string
 	ExternalHostname string
-	CertificateName  string
+	OriginCert       []byte
 }
 
 // compare origin.tunnelConfig
@@ -93,14 +93,17 @@ func (mgr *TunnelPodManager) Config() Config {
 }
 
 func (mgr *TunnelPodManager) init() error {
+
+	// XX ConfigMap Removed
+
 	// check existence of configmap
-	_, err := mgr.client.CoreV1().ConfigMaps(mgr.config.Namespace).Get(mgr.config.CertificateName, meta_v1.GetOptions{})
-	if err != nil {
-		return err
-	}
+	// _, err := mgr.client.CoreV1().ConfigMaps(mgr.config.Namespace).Get(mgr.config.CertificateName, meta_v1.GetOptions{})
+	// if err != nil {
+	// 	return err
+	// }
 
 	rs := mgr.getReplicaSetDefinition()
-	rs, err = mgr.client.ExtensionsV1beta1().ReplicaSets(mgr.config.Namespace).Create(rs)
+	rs, err := mgr.client.ExtensionsV1beta1().ReplicaSets(mgr.config.Namespace).Create(rs)
 	if err != nil {
 		return err
 	}
@@ -130,7 +133,7 @@ func (mgr *TunnelPodManager) getReplicaSetDefinition() *ext_v1beta1.ReplicaSet {
 							VolumeSource: v1.VolumeSource{
 								ConfigMap: &v1.ConfigMapVolumeSource{
 									LocalObjectReference: v1.LocalObjectReference{
-										Name: mgr.config.CertificateName,
+										Name: "cloudflare-warp",
 									},
 								},
 							},

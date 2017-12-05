@@ -3,7 +3,6 @@ package tunnel
 import (
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
 	"time"
 
 	"github.com/cloudflare/cloudflare-warp-ingress/pkg/cloudflare"
@@ -44,14 +43,6 @@ type WarpManager struct {
 // NewWarpManager is a wrapper around a warp tunnel running in a goroutine
 func NewWarpManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, error) {
 
-	// path to pem file should be passed in,
-	// or here, assume that it is mounted at a particular location
-	originCertPath := "/etc/cloudflare-warp/cert.pem"
-	originCert, err := ioutil.ReadFile(originCertPath)
-	if err != nil {
-		return nil, fmt.Errorf("Cannot read %s to load origin certificate, %v", originCertPath, err)
-	}
-
 	haConnections := 1
 
 	protocolLogger := log.WithFields(log.Fields{
@@ -62,8 +53,8 @@ func NewWarpManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, error)
 		EdgeAddrs:         []string{"cftunnel.com:7844"},
 		OriginUrl:         config.ServiceName,
 		Hostname:          config.ExternalHostname,
-		OriginCert:        originCert,    // []byte{}
-		TlsConfig:         &tls.Config{}, // need to load the cloudflare cert
+		OriginCert:        config.OriginCert, // []byte{}
+		TlsConfig:         &tls.Config{},     // need to load the cloudflare cert
 		Retries:           5,
 		HeartbeatInterval: 5 * time.Second,
 		MaxHeartbeats:     5,

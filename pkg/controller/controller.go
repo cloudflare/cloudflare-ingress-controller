@@ -334,7 +334,7 @@ func parseIngressKey(queueKey string) (string, string, string) {
 
 func (w *WarpController) processIngress(queueKey string) error {
 
-	op, servicename, ingressname := parseIngressKey(queueKey)
+	op, ingressname, servicename := parseIngressKey(queueKey)
 
 	switch op {
 
@@ -567,7 +567,7 @@ func (w *WarpController) startOrStop(servicename string) error {
 		return nil
 	}
 
-	glog.V(5).Infof("Validation ok for starting %s/%s/%d", servicename, endpoints.Name, len(endpoints.Subsets))
+	glog.V(5).Infof("Validation ok for starting %s/%d", servicename, len(endpoints.Subsets))
 	if !t.Active() {
 		return t.Start()
 	}

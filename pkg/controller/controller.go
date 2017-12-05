@@ -343,7 +343,7 @@ func (w *WarpController) processIngress(queueKey string) error {
 		ingress, err := w.ingressLister.Ingresses(w.namespace).Get(ingressname)
 		tunnel := w.tunnels[servicename]
 		if tunnel != nil {
-			glog.V(4).Infof("Tunnel \"%s\" (%s) already exists", servicename, tunnel.Config().ExternalHostname)
+			glog.V(5).Infof("Tunnel \"%s\" (%s) already exists", servicename, tunnel.Config().ExternalHostname)
 			// return tunnel.CheckStatus()
 			return nil
 		}
@@ -363,7 +363,7 @@ func (w *WarpController) processIngress(queueKey string) error {
 		tunnel := w.tunnels[servicename]
 
 		if tunnel == nil {
-			glog.V(4).Infof("Ingress %s is missing a tunnel, creating now", servicename)
+			glog.V(5).Infof("Ingress %s is missing a tunnel, creating now", servicename)
 
 			ingress, err := w.ingressLister.Ingresses(w.namespace).Get(ingressname)
 			if err != nil {
@@ -514,7 +514,7 @@ func (w *WarpController) createTunnel(ingress *v1beta1.Ingress) error {
 	if err != nil {
 		return err
 	}
-	glog.V(4).Infof("creating tunnel for ingress %s", ingress.GetName())
+	glog.V(5).Infof("creating tunnel for ingress %s", ingress.GetName())
 	serviceName := w.getServiceNameForIngress(ingress)
 	hostName := w.getHostNameForIngress(ingress)
 	originCert, err := w.readOriginCert(hostName)
@@ -524,19 +524,17 @@ func (w *WarpController) createTunnel(ingress *v1beta1.Ingress) error {
 
 	config := &tunnel.Config{
 		ServiceName:      serviceName,
-		Namespace:        w.namespace,
 		ExternalHostname: hostName,
 		OriginCert:       originCert,
 	}
 
-	// tunnel, err := tunnel.NewTunnelPodManager(w.client, config)
 	tunnel, err := tunnel.NewWarpManager(config, w.metricsConfig)
 
 	if err != nil {
 		return err
 	}
 	w.tunnels[serviceName] = tunnel
-	glog.V(4).Infof("added tunnel for ingress %s, service %s", ingress.GetName(), serviceName)
+	glog.V(5).Infof("added tunnel for ingress %s, service %s", ingress.GetName(), serviceName)
 
 	return w.startOrStop(serviceName)
 }
@@ -553,7 +551,7 @@ func (w *WarpController) startOrStop(servicename string) error {
 
 	service, err := w.serviceLister.Services(w.namespace).Get(servicename)
 	if service == nil || err != nil {
-		glog.V(5).Infof("Service %s not found for tunnel", servicename)
+		glog.V(2).Infof("Service %s not found for tunnel", servicename)
 		if t.Active() {
 			return t.Stop()
 		}
@@ -561,7 +559,7 @@ func (w *WarpController) startOrStop(servicename string) error {
 	}
 	endpoints, err := w.endpointsLister.Endpoints(w.namespace).Get(servicename)
 	if err != nil || endpoints == nil || len(endpoints.Subsets) == 0 {
-		glog.V(5).Infof("Endpoints %s not found for tunnel", servicename)
+		glog.V(2).Infof("Endpoints %s not found for tunnel", servicename)
 
 		if t.Active() {
 			return t.Stop()
@@ -588,7 +586,7 @@ func (w *WarpController) removeTunnel(servicename string) error {
 }
 
 func (w *WarpController) tearDown() error {
-	glog.V(4).Infof("Tearing down tunnels")
+	glog.V(2).Infof("Tearing down tunnels")
 
 	for _, t := range w.tunnels {
 		t.TearDown()

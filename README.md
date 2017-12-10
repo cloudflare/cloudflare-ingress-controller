@@ -6,7 +6,7 @@ to connect a cloudflare-managed URL to a Kubernetes service.
 
 ## Getting started
 
-The warp controller will manage ingress tunnels in a single
+The Warp controller will manage ingress tunnels in a single
 namespace of the cluster.  Multiple controllers can exist
 in different namespaces, with different credentials for
 each namespace.
@@ -15,9 +15,9 @@ each namespace.
 #### Pre-requirements
 
 To use this, you need:
-- a Cloudflare account (free tier is OK)
+- a [Cloudflare](https://www.cloudflare.com/) account (free tier is OK)
 - a zone (domain name) in your Cloudflare account 
-- a Kubernetes cluster
+- a [Kubernetes](https://kubernetes.io/) cluster
 
 The deployment instructions below use a few YAML files that
 will be used with `kubectl` to create the appropriate resources
@@ -25,12 +25,12 @@ in Kubernetes. You might want to checkout that repository
 to have them handy!
 
 
-#### Get warp credentials
+#### Get Warp credentials
 
 The first step is to obtain the credentials that will
 be used by the controller to authenticate with Cloudflare.
 
-First, install the warp client.
+First, install the Warp client.
 
 ```
 # On Linux
@@ -67,9 +67,9 @@ kubectl create secret generic cloudflare-warp-cert \
 ```
 
 
-#### Deploy the warp controller
+#### Deploy the Warp controller
 
-This will create a service account for the warp controller, and
+This will create a service account for the Warp controller, and
 create a Kubernetes "deployment" resource for the controller
 (just like `kubectl run` would).
 
@@ -81,7 +81,7 @@ kubectl create -f deploy/warp-controller-deployment.yaml
 
 #### RBAC configuration
 
-If your cluster has RBAC enabled, then the warp controller must be configured
+If your cluster has RBAC enabled, then the Warp controller must be configured
 with sufficient rights to observe ingresses, services and endpoints.
 
 ```
@@ -125,13 +125,13 @@ kubectl logs deploy/warp-controller
 
 The ingress must have the annotation
 _kubernetes.io<span>/</span>ingress.class: cloudflare-warp_ in order to be managed
-by the warp controller.
+by the Warp controller.
 
 
 #### Namespaces
 
 Most ingress controllers are deployed to be globally available to the
-Kubernetes cluster (e.g. in the `kube-system` namespace). The warp
+Kubernetes cluster (e.g. in the `kube-system` namespace). The Warp
 controller is a bit different. Since it holds the credentials for a
 specific DNS zone, you may want to deploy different instances with
 different credentials in different namespaces. The example above
@@ -156,7 +156,7 @@ The `command:` section should look like the one below:
 
 ## Design
 
-There is a one-to-one relationship between a cloudflare url, a warp
+There is a one-to-one relationship between a cloudflare url, a Warp
 tunnel, and a kubernetes service.  The controller watches the creation,
 update and deletion of ingresses, services and endpoints.  When an
 ingress with matching annotation is created, a tunnel-management
@@ -164,7 +164,7 @@ object is created to match it. The life-cycle of this tunnel-management
 object matches the life-cycle of the ingress.
 
 When a service and at least one endpoint exist to match that ingress,
-the warp tunnel is created to route traffic though to the kubernetes
+the Warp tunnel is created to route traffic though to the kubernetes
 service, using kubernetes service-load-balancing to distribute traffic to
 the endpoints.
 
@@ -174,7 +174,7 @@ with the assumption that a cloudflare account is associated
 with a namespace.
 
 There are two implementiations of the Tunnel interface.  The
-TunnelPodManager manages a pod that runs the warp client code.  This
+TunnelPodManager manages a pod that runs the Warp client code.  This
 pod has the cloudflare credentials configmap mounted into it, and
 arguments passed to the commandline. When the ingress and service
 and endpoints are present, the pod is created.  When the service or

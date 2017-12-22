@@ -41,7 +41,7 @@
   branch = "master"
   name = "github.com/cloudflare/cloudflare-warp"
   packages = ["h2mux","origin","tunnelrpc","tunnelrpc/pogs","validation"]
-  revision = "d40eb85da68ca3bfa2a730be2b09130769234633"
+  revision = "e0ae598112f9d65a6c6e4036157bf3bbcfec510f"
 
 [[projects]]
   name = "github.com/davecgh/go-spew"
@@ -296,6 +296,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "38189799e02431af1df10effa7e100c5a403fce0368ba92d50d04d549f5fe40d"
+  inputs-digest = "e7a1e32440d0047ebfd5631e6c2f9059607ab808307244418881a49d95db4972"
   solver-name = "gps-cdcl"
   solver-version = 1

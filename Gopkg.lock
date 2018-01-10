@@ -28,8 +28,8 @@
 [[projects]]
   name = "github.com/certifi/gocertifi"
   packages = ["."]
-  revision = "a4ab0227d360091084658029ec8ae45f989fba3e"
-  version = "2017.11.05"
+  revision = "deb3ae2ef2610fde3330947281941c562861188b"
+  version = "2018.01.18"
 
 [[projects]]
   branch = "master"
@@ -42,7 +42,7 @@
     "validation",
     "websocket"
   ]
-  revision = "3780e14f41a5bf16b4aa5bad6c7d708083d24095"
+  revision = "96dd6cc3a0e837a62ba8e8ffa46418a6fdec2f38"
 
 [[projects]]
   name = "github.com/davecgh/go-spew"
@@ -65,8 +65,8 @@
     ".",
     "log"
   ]
-  revision = "5741799b275a3c4a5a9623a993576d7545cf7b5c"
-  version = "v2.4.0"
+  revision = "26b41036311f2da8242db402557a0dbd09dc83da"
+  version = "v2.6.0"
 
 [[projects]]
   name = "github.com/emicklei/go-restful-swagger12"
@@ -78,7 +78,7 @@
   branch = "master"
   name = "github.com/getsentry/raven-go"
   packages = ["."]
-  revision = "c9de0b92586aaba092c2a231cb7384354b178544"
+  revision = "563b81fc02b75d664e54da31f787c2cc2186780b"
 
 [[projects]]
   name = "github.com/ghodss/yaml"
@@ -90,13 +90,13 @@
   branch = "master"
   name = "github.com/go-openapi/analysis"
   packages = ["."]
-  revision = "8ed83f2ea9f00f945516462951a288eaa68bf0d6"
+  revision = "f59a71f0ece6f9dfb438be7f45148f006cbad88e"
 
 [[projects]]
   branch = "master"
   name = "github.com/go-openapi/errors"
   packages = ["."]
-  revision = "03cfca65330da08a5a440053faf994a3c682b5bf"
+  revision = "7bcb96a367bac6b76e6e42fa84155bb5581dcff8"
 
 [[projects]]
   branch = "master"
@@ -114,25 +114,25 @@
   branch = "master"
   name = "github.com/go-openapi/loads"
   packages = ["."]
-  revision = "c3e1ca4c0b6160cac10aeef7e8b425cc95b9c820"
+  revision = "2a2b323bab96e6b1fdee110e57d959322446e9c9"
 
 [[projects]]
   branch = "master"
   name = "github.com/go-openapi/spec"
   packages = ["."]
-  revision = "5a4a1e94454f878ce1e1fefff23ea10bd5dd5110"
+  revision = "d8000b5bfbd1147255710505a27c735b6b2ae2ac"
 
 [[projects]]
   branch = "master"
   name = "github.com/go-openapi/strfmt"
   packages = ["."]
-  revision = "610b6cacdcde6852f4de68998bd20ce1dac85b22"
+  revision = "6d1a47fad79c81e8cd732889cb80e91123951860"
 
 [[projects]]
   branch = "master"
   name = "github.com/go-openapi/swag"
   packages = ["."]
-  revision = "cf0bdb963811675a4d7e74901cefc7411a1df939"
+  revision = "ceb469cb0fdf2d792f28d771bc05da6c606f55e5"
 
 [[projects]]
   name = "github.com/gogo/protobuf"
@@ -140,8 +140,8 @@
     "proto",
     "sortkeys"
   ]
-  revision = "342cbe0a04158f6dcb03ca0079991a51a4248c02"
-  version = "v0.5"
+  revision = "1adfc126b41513cc696b209667c8656ea7aac67c"
+  version = "v1.0.0"
 
 [[projects]]
   branch = "master"
@@ -150,10 +150,10 @@
   revision = "23def4e6c14b4da8ac2ed8007337bc5eb5007998"
 
 [[projects]]
-  branch = "master"
   name = "github.com/golang/protobuf"
   packages = ["proto"]
-  revision = "1e59b77b52bf8e4b449a57e6f79f21226d571845"
+  revision = "925541529c1fa6821df4e44ce2723319eb2be768"
+  version = "v1.0.0"
 
 [[projects]]
   branch = "master"
@@ -174,7 +174,7 @@
     ".",
     "simplelru"
   ]
-  revision = "0a025b7e63adc15a622f29b0b2c4c3848243bbf6"
+  revision = "0fb14efe8c47ae851c0034ed7a448854d3d34cf3"
 
 [[projects]]
   branch = "master"
@@ -185,14 +185,14 @@
 [[projects]]
   name = "github.com/imdario/mergo"
   packages = ["."]
-  revision = "7fe0c75c13abdee74b09fcacef5ea1c6bba6a874"
-  version = "0.2.4"
+  revision = "163f41321a19dd09362d4c63cc2489db2015f1f4"
+  version = "0.3.2"
 
 [[projects]]
-  branch = "master"
   name = "github.com/juju/ratelimit"
   packages = ["."]
   revision = "59fac5042749a5afb9af70e813da1dd5474f0167"
+  version = "1.0.1"
 
 [[projects]]
   branch = "master"
@@ -214,7 +214,7 @@
   branch = "master"
   name = "github.com/mitchellh/mapstructure"
   packages = ["."]
-  revision = "06020f85339e21b2478f756a78e295255ffa4d6a"
+  revision = "00c29f56e2386353d58c599509e8dc3801b0d716"
 
 [[projects]]
   name = "github.com/pkg/errors"
@@ -248,16 +248,18 @@
     "internal/bitbucket.org/ww/goautoneg",
     "model"
   ]
-  revision = "2e54d0b93cba2fd133edc32211dcc32c06ef72ca"
+  revision = "6fb6fce6f8b75884b92e1889c150403fc0872c5e"
 
 [[projects]]
   branch = "master"
   name = "github.com/prometheus/procfs"
   packages = [
     ".",
+    "internal/util",
+    "nfs",
     "xfs"
   ]
-  revision = "a6e9df898b1336106c743392c48ee0b71f5c4efa"
+  revision = "d274e363d5759d1c916232217be421f1cc89c5fe"
 
 [[projects]]
   name = "github.com/sirupsen/logrus"
@@ -286,7 +288,7 @@
   branch = "master"
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
-  revision = "94eea52f7b742c7cbe0b03b22f0c4c8631ece122"
+  revision = "91a49db82a88618983a78a06c1cbd4e00ab749ab"
 
 [[projects]]
   branch = "master"
@@ -300,7 +302,7 @@
     "lex/httplex",
     "trace"
   ]
-  revision = "a8b9294777976932365dabb6640cf1468d95c70f"
+  revision = "22ae77b79946ea320088417e4d50825671d82d57"
 
 [[projects]]
   branch = "master"
@@ -309,10 +311,9 @@
     "unix",
     "windows"
   ]
-  revision = "8b4580aae2a0dd0c231a45d3ccb8434ff533b840"
+  revision = "dd2ff4accc098aceecb86b36eaa7829b2a17b1c9"
 
 [[projects]]
-  branch = "master"
   name = "golang.org/x/text"
   packages = [
     "collate",
@@ -331,7 +332,8 @@
     "unicode/rangetable",
     "width"
   ]
-  revision = "75cc3cad82b5f47d3fb229ddda8c5167da14f294"
+  revision = "f21a4dfb5e38f5895301dc265a8def02365cc3d0"
+  version = "v0.3.0"
 
 [[projects]]
   name = "gopkg.in/inf.v0"
@@ -349,10 +351,10 @@
   revision = "3f83fa5005286a7fe593b055f0d7771a7dce4655"
 
 [[projects]]
-  branch = "v2"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
-  revision = "287cf08546ab5e7e37d55a84f7ed3fd1db036de5"
+  revision = "7f97868eec74b32b0982dd158a51a446d1da7eb5"
+  version = "v2.1.1"
 
 [[projects]]
   name = "k8s.io/apimachinery"

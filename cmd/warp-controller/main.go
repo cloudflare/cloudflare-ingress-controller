@@ -49,6 +49,7 @@ func main() {
 	}
 
 	warp := controller.NewWarpController(client, *namespace)
+	warp.EnableMetrics()
 
 	stopCh := make(chan struct{})
 	// defer close(stopCh)

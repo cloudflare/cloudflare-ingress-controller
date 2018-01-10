@@ -1,6 +1,8 @@
 package tunnel
 
-import "k8s.io/apimachinery/pkg/util/intstr"
+import (
+	"k8s.io/apimachinery/pkg/util/intstr"
+)
 
 // Tunnel is the interface for different implementation of
 // the cloudflare-warp tunnel, matching an external hostname
@@ -32,5 +34,6 @@ type Config struct {
 	ServiceName      string
 	ServicePort      intstr.IntOrString // maps either to service.Name (string) or service.Port (int32)
 	ExternalHostname string
+	LBPool           string
 	OriginCert       []byte
 }

@@ -16,6 +16,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
+	"k8s.io/apimachinery/pkg/util/intstr"
+
 	lister_v1 "k8s.io/client-go/listers/core/v1"
 	lister_v1beta1 "k8s.io/client-go/listers/extensions/v1beta1"
 
@@ -480,16 +482,6 @@ func (w *WarpController) validateIngress(ingress *v1beta1.Ingress) error {
 	return nil
 }
 
-// assumes validation
-func (w *WarpController) getServiceNameForIngress(ingress *v1beta1.Ingress) string {
-	return ingress.Spec.Rules[0].HTTP.Paths[0].Backend.ServiceName
-}
-
-// assumes validation
-func (w *WarpController) getHostNameForIngress(ingress *v1beta1.Ingress) string {
-	return ingress.Spec.Rules[0].Host
-}
-
 // obtains the origin cert for a particular hostname
 func (w *WarpController) readOriginCert(hostname string) ([]byte, error) {
 	// in the future, we will have multiple secrets
@@ -515,8 +507,9 @@ func (w *WarpController) createTunnel(ingress *v1beta1.Ingress) error {
 		return err
 	}
 	glog.V(5).Infof("creating tunnel for ingress %s", ingress.GetName())
-	serviceName := w.getServiceNameForIngress(ingress)
-	hostName := w.getHostNameForIngress(ingress)
+	serviceName := ingress.Spec.Rules[0].HTTP.Paths[0].Backend.ServiceName
+	servicePort := ingress.Spec.Rules[0].HTTP.Paths[0].Backend.ServicePort
+	hostName := ingress.Spec.Rules[0].Host
 	originCert, err := w.readOriginCert(hostName)
 	if err != nil {
 		return err
@@ -524,6 +517,7 @@ func (w *WarpController) createTunnel(ingress *v1beta1.Ingress) error {
 
 	config := &tunnel.Config{
 		ServiceName:      serviceName,
+		ServicePort:      servicePort,
 		ExternalHostname: hostName,
 		OriginCert:       originCert,
 	}
@@ -569,7 +563,22 @@ func (w *WarpController) startOrStop(servicename string) error {
 
 	glog.V(5).Infof("Validation ok for starting %s/%d", servicename, len(endpoints.Subsets))
 	if !t.Active() {
-		return t.Start()
+		var port int32
+		ingressServicePort := t.Config().ServicePort
+		for _, p := range service.Spec.Ports {
+
+			// equality
+			if (ingressServicePort.Type == intstr.Int && p.Port == ingressServicePort.IntVal) ||
+				(ingressServicePort.Type == intstr.String && p.Name == ingressServicePort.StrVal) {
+				port = p.Port
+			}
+		}
+		if port == 0 {
+			return fmt.Errorf("Unable to match port %s to service %s", ingressServicePort.String(), servicename)
+		}
+		url := fmt.Sprintf("%s:%d", service.ObjectMeta.Name, port)
+		glog.V(5).Infof("Starting tunnel to url %s", url)
+		return t.Start(url)
 	}
 	return nil
 }

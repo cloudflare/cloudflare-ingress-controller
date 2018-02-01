@@ -1,0 +1,23 @@
+To verify that OpenFaaS has started:
+
+kubectl --namespace={{ .Release.Namespace }} get deployments -l "release={{ .Release.Name }}, app={{ template "cloudflare-warp-ingress.name" . }}"
+
+To set up a warp tunnel to your service, install an ingress of this form:
+
+    apiVersion: extensions/v1beta1
+    kind: Ingress
+    metadata:
+      annotations:
+        kubernetes.io/ingress.class: cloudflare-warp
+      name: [NAME OF INGRESS]
+      namespace: {{ .Release.Namespace }}
+    spec:
+      rules:
+      - host: [NAME].my-cloudflare-domain.com
+        http:
+          paths:
+          - backend:
+              serviceName: [NAME OF SERVICE]
+              servicePort: [SERVICE PORT]
+
+For more information, visit https://warp.cloudflare.com/

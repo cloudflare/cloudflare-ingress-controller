@@ -1,0 +1,24 @@
+{{ if .Values.rbac.install }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name:  {{ .Values.rbac.roleName }}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  - "extensions"
+  resources:
+  - ingresses
+  - services
+  - endpoints
+  verbs:
+  - list
+  - get
+  - watch
+{{ end }}

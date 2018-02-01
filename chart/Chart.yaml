@@ -1,0 +1,10 @@
+apiVersion: v1
+description: Installs the cloudflare warp ingress controller
+home: https://warp.cloudflare.com/
+maintainers:
+- email: nate@stackpointcloud.com
+  name: Nathan Franzen
+- email: rmocius@gmail.com
+  name: rimusz
+name: cloudflare-warp-ingress
+version: 0.1.3

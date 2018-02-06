@@ -138,13 +138,13 @@ different credentials in different namespaces. The example above
 will create the ingress in your default namespace.
 
 If you want to deploy the controller to a different namespace, you
-need to:
+need to do both of the following:
 - point `kubectl` to the right namespace (using `--namespace`, or
-  `set-context`, or whatever suits your fancfy)
+  `set-context`, or whatever you prefer)
 - edit `deploy/warp-controller-deployment.yaml` to specify the
-  namespace you want to use on the controller command line
+  namespace you want to use on the controller command line using the `-namespace` flag
   
-The `command:` section should look like the one below:
+For example, to manage ingress resources in the `blue` namespace, the `command:` block in your `warp-controller-deployment.yaml` should look like the one below:
 
 ```yaml
 - command:
@@ -152,7 +152,10 @@ The `command:` section should look like the one below:
   - -v=6
   - -namespace=blue
 ```
-
+and could be deployed using 
+```
+kubectl create --namespace blue -f deploy/warp-controller-deployment.yaml
+```
 
 ## Design
 

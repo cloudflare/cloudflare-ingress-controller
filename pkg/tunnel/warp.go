@@ -45,7 +45,9 @@ func NewWarpManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, error)
 
 	haConnections := 1
 
-	protocolLogger := log.WithFields(log.Fields{
+	protocolLogger := log.New()
+
+	tunnelLogger := log.WithFields(log.Fields{
 		"service": config.ServiceName,
 	}).Logger
 
@@ -66,6 +68,8 @@ func NewWarpManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, error)
 		Metrics:           metricsSetup.Metrics,
 		MetricsUpdateFreq: metricsSetup.UpdateFrequency,
 		ProtocolLogger:    protocolLogger,
+		Logger:            tunnelLogger,
+		IsAutoupdated:     false,
 	}
 
 	tunnelConfig.TlsConfig.RootCAs = cloudflare.GetCloudflareRootCA()

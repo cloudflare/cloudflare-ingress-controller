@@ -10,7 +10,7 @@ import (
 	tunnelpogs "github.com/cloudflare/cloudflare-warp/tunnelrpc/pogs"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 const ()

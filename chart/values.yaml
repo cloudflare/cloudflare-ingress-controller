@@ -1,0 +1,25 @@
+# Default values for cloudflare-warp-ingress
+
+replicaCount: 1
+
+image:
+  repository: quay.io/stackpoint/warp-controller
+  tag: v0.3.1
+  pullPolicy: Always
+
+# The Cloudflare Warp cert must be encoded with base64
+# e.g. `cat cloudflare-warp.pem | base64`
+cert: "Paste base64 encoded data here."
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+rbac:
+  install: false
+  serviceAccount: cloudflare-warp
+  roleName: cloudflare-warp

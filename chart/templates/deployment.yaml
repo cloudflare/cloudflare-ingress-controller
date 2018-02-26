@@ -1,0 +1,42 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: {{ template "cloudflare-warp-ingress.fullname" . }}
+  labels:
+    app: {{ template "cloudflare-warp-ingress.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "cloudflare-warp-ingress.name" . }}
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          command:
+          - /warp-controller
+          - -v=6
+          - -namespace
+          - {{ .Release.Namespace }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+          volumeMounts:
+            - name: cloudflare-warp-cert
+              mountPath: /etc/cloudflare-warp
+              readOnly: true
+      volumes:
+        - name: cloudflare-warp-cert
+          secret:
+            secretName: cloudflare-warp-cert
+    {{- if .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+    {{- end }}
+      serviceAccount: {{ .Values.rbac.serviceAccount }}
+      serviceAccountName: {{ .Values.rbac.serviceAccount }}

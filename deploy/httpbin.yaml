@@ -39,7 +39,7 @@ items:
       kubernetes.io/ingress.class: cloudflare-warp
   spec:
     rules:
-    - host: httpbin.anthopleura.net
+    - host: httpbin.example.co
       http:
         paths:
         - path: /

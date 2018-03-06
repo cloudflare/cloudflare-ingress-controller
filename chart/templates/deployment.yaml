@@ -15,6 +15,18 @@ spec:
         app: {{ template "cloudflare-warp-ingress.name" . }}
         release: {{ .Release.Name }}
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - {{ template "cloudflare-warp-ingress.name" . }}
+              topologyKey: kubernetes.io/hostname
       containers:
         - name: {{ .Chart.Name }}
           command:
@@ -26,14 +38,6 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           resources:
 {{ toYaml .Values.resources | indent 12 }}
-          volumeMounts:
-            - name: cloudflare-warp-cert
-              mountPath: /etc/cloudflare-warp
-              readOnly: true
-      volumes:
-        - name: cloudflare-warp-cert
-          secret:
-            secretName: cloudflare-warp-cert
     {{- if .Values.nodeSelector }}
       nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 8 }}

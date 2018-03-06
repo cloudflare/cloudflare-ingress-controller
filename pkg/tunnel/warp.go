@@ -13,8 +13,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const ()
-
 // WarpManager manages a single tunnel in a goroutine
 type WarpManager struct {
 	id           string
@@ -23,22 +21,6 @@ type WarpManager struct {
 	errCh        chan error
 	stopCh       chan struct{}
 }
-
-// tunnelConfig := &origin.TunnelConfig{
-// 	EdgeAddr:          c.String("edge"),
-// 	OriginUrl:         url,
-// 	Hostname:          hostname,
-// 	OriginCert:        originCert,
-// 	TlsConfig:         &tls.Config{},
-// 	Retries:           c.Uint("retries"),
-// 	HeartbeatInterval: c.Duration("heartbeat-interval"),
-// 	MaxHeartbeats:     c.Uint64("heartbeat-count"),
-// 	ClientID:          clientID,
-// 	ReportedVersion:   Version,
-// 	LBPool:            c.String("lb-pool"),
-// 	Tags:              tags,
-// 	ConnectedSignal:   h2mux.NewSignal(),
-// }
 
 // NewWarpManager is a wrapper around a warp tunnel running in a goroutine
 func NewWarpManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, error) {
@@ -62,7 +44,7 @@ func NewWarpManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, error)
 		MaxHeartbeats:     5,
 		ClientID:          utilrand.String(16),
 		ReportedVersion:   "DEV",
-		LBPool:            "",
+		LBPool:            config.LBPool,
 		Tags:              []tunnelpogs.Tag{},
 		HAConnections:     haConnections,
 		Metrics:           metricsSetup.Metrics,

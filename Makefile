@@ -21,7 +21,7 @@ VERSION ?= $(shell git describe --tags --always --dirty)
 ### These variables should not need tweaking.
 ###
 
-SRC_DIRS := cmd h2mux metrics origin pkg tlsconfig tunnelrpc validation # directories which hold app source (not vendored)
+SRC_DIRS := cmd pkg # directories which hold app source (not vendored)
 
 ALL_ARCH := amd64 arm arm64 ppc64le
 
@@ -159,7 +159,6 @@ test: build-dirs
 	    $(BUILD_IMAGE)                                                      \
 	    /bin/sh -c "                                                        \
 	        ./build/test.sh $(SRC_DIRS)                                     \
-
 	    "
 
 build-dirs:

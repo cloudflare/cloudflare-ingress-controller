@@ -1,15 +1,11 @@
-# Default values for cloudflare-warp-ingress
+# Default values for cloudflare-warp-ingress.
 
-replicaCount: 1
+replicaCount: 2
 
 image:
   repository: quay.io/stackpoint/warp-controller
-  tag: v0.3.1
+  tag: 0.4.0
   pullPolicy: Always
-
-# The Cloudflare Warp cert must be encoded with base64
-# e.g. `cat cloudflare-warp.pem | base64`
-cert: "Paste base64 encoded data here."
 
 resources:
   limits:
@@ -20,6 +16,15 @@ resources:
     memory: 128Mi
 
 rbac:
-  install: false
+  install: true
   serviceAccount: cloudflare-warp
   roleName: cloudflare-warp
+
+# The secret contains the base64-encoded origin certificate for your cloudflare domain.
+# Set the install flag false to configure manually in the cluster later.
+# See https://warp.cloudflare.com/quickstart/quickstart/ for information on
+# obtaining the origin certificate
+secret:
+  install: false
+  domain: example.co
+  certificate_b64: LS0tLS1CRUdJTiB...

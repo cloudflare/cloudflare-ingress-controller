@@ -5,13 +5,17 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/labels"
+
 	"github.com/golang/glog"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	//v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
+	// v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -24,7 +28,13 @@ import (
 	"github.com/cloudflare/cloudflare-warp-ingress/pkg/tunnel"
 )
 
-const maxRetries = 5
+const (
+	maxRetries                = 5
+	ingressClassKey           = "kubernetes.io/ingress.class"
+	cloudflareWarpIngressType = "cloudflare-warp"
+	ingressAnnotationLBPool   = "warp.cloudflare.com/lb-pool"
+	secretLabelDomain         = "warp.cloudflare.com/domain"
+)
 
 // WarpController object
 type WarpController struct {
@@ -52,12 +62,11 @@ func NewWarpController(client kubernetes.Interface, namespace string) *WarpContr
 	informer, indexer, queue := createIngressInformer(client, namespace)
 	tunnels := make(map[string]tunnel.Tunnel, 0)
 
-	metricsConfig := tunnel.NewMetrics()
-
 	w := &WarpController{
 		client: client,
 
-		metricsConfig: metricsConfig,
+		// for testing initialize with dummy metrics object
+		metricsConfig: tunnel.NewDummyMetrics(),
 
 		ingressInformer:  informer,
 		ingressWorkqueue: queue,
@@ -70,6 +79,11 @@ func NewWarpController(client kubernetes.Interface, namespace string) *WarpContr
 	w.configureEndpointInformer()
 
 	return w
+}
+
+// EnableMetrics configures a new metrics config for the controller
+func (w *WarpController) EnableMetrics() {
+	w.metricsConfig = tunnel.NewMetrics()
 }
 
 func createIngressInformer(client kubernetes.Interface, namespace string) (cache.Controller, cache.Indexer, workqueue.RateLimitingInterface) {
@@ -120,7 +134,6 @@ func createIngressInformer(client kubernetes.Interface, namespace string) (cache
 // key is: ingressname+"/"+servicename
 // allows lookup by either the ingress name or the service name
 func shouldHandleIngress(obj interface{}) (string, bool) {
-	var ingressClassKey = "kubernetes.io/ingress.class"
 
 	ingress, ok := obj.(*v1beta1.Ingress)
 	if !ok {
@@ -133,16 +146,24 @@ func shouldHandleIngress(obj interface{}) (string, bool) {
 		return "", false
 	}
 	glog.V(5).Infof("Annotation %s=%s", ingressClassKey, val)
-	if val != "cloudflare-warp" {
+	if val != cloudflareWarpIngressType {
 		return "", false
 	}
 
 	rules := ingress.Spec.Rules
+	if len(rules) == 0 {
+		glog.V(2).Infof("Cannot create tunnel for ingress with no rules")
+		return "", false
+	}
 	if len(rules) > 1 {
 		glog.V(2).Infof("Cannot create tunnel for ingress with multiple rules")
 		return "", false
 	}
 	paths := rules[0].HTTP.Paths
+	if len(paths) == 0 {
+		glog.V(2).Infof("Cannot create tunnel for ingress with no paths")
+		return "", false
+	}
 	if len(paths) > 1 {
 		glog.V(2).Infof("Cannot create tunnel for ingress with multiple paths")
 		return "", false
@@ -350,6 +371,10 @@ func (w *WarpController) processIngress(queueKey string) error {
 			return nil
 		}
 		if err != nil {
+
+			all, _ := w.ingressLister.Ingresses(w.namespace).List(labels.Everything())
+			glog.V(2).Infof("all ingresses in %s: %v", w.namespace, all)
+
 			return fmt.Errorf("failed to retrieve ingress by name %q: %v", ingressname, err)
 		}
 
@@ -362,6 +387,8 @@ func (w *WarpController) processIngress(queueKey string) error {
 	case "update":
 		// Not clear how much work we should put into watching the running state of the tunnel so
 		// lets just do CheckStatus here every time we see an ingress update
+		//
+		// if the ingress has been edited to change the hostname, we should update
 		tunnel := w.tunnels[servicename]
 
 		if tunnel == nil {
@@ -439,7 +466,6 @@ func (w *WarpController) processService(queueKey string) error {
 		return fmt.Errorf("Unhandled operation \"%s\", %s", op, name)
 
 	}
-	return nil
 }
 
 func (w *WarpController) getTunnelForService(servicename string) tunnel.Tunnel {
@@ -472,14 +498,76 @@ func handleErr(err error, key interface{}, queue workqueue.RateLimitingInterface
 // returns non-nil error if the ingress is not something we can deal with
 func (w *WarpController) validateIngress(ingress *v1beta1.Ingress) error {
 	rules := ingress.Spec.Rules
+	if len(rules) == 0 {
+		return fmt.Errorf("Cannot create tunnel for ingress with no rules")
+	}
 	if len(rules) > 1 {
 		return fmt.Errorf("Cannot create tunnel for ingress with multiple rules")
 	}
 	paths := rules[0].HTTP.Paths
+	if len(paths) == 0 {
+		return fmt.Errorf("Cannot create tunnel for ingress with no paths")
+	}
 	if len(paths) > 1 {
 		return fmt.Errorf("Cannot create tunnel for ingress with multiple paths")
 	}
 	return nil
+}
+
+// assumes validation
+func (w *WarpController) getServiceNameForIngress(ingress *v1beta1.Ingress) string {
+	return ingress.Spec.Rules[0].HTTP.Paths[0].Backend.ServiceName
+}
+
+// assumes validation
+func (w *WarpController) getServicePortForIngress(ingress *v1beta1.Ingress) intstr.IntOrString {
+	return ingress.Spec.Rules[0].HTTP.Paths[0].Backend.ServicePort
+}
+
+// assumes validation
+func (w *WarpController) getHostNameForIngress(ingress *v1beta1.Ingress) string {
+	return ingress.Spec.Rules[0].Host
+}
+
+// assumes validation
+func (w *WarpController) getLBPoolForIngress(ingress *v1beta1.Ingress) string {
+	// // disabled: multiple pools per hostname is not yet supported in cloudflare-warp
+	// // instead, use the hostname itself as the name of the pool
+	//
+	// lbPoolName := ingress.ObjectMeta.Annotations[ingressAnnotationLBPool]
+	// if lbPoolName == "" {
+	// 	lbPoolName = w.getServiceNameForIngress(ingress) + "." + ingress.ObjectMeta.Namespace
+	// }
+	// return lbPoolName
+	//
+	return w.getHostNameForIngress(ingress)
+}
+
+func (w *WarpController) readSecret(hostname string) (*v1.Secret, error) {
+
+	var certSecret *v1.Secret
+	var certSecretList *v1.SecretList
+	// loop over decrements of the hostname
+	certSecretList, err := w.client.CoreV1().Secrets(w.namespace).List(
+		meta_v1.ListOptions{
+			LabelSelector: secretLabelDomain + "=" + hostname,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	if len(certSecretList.Items) > 0 {
+		return &certSecretList.Items[0], nil
+	}
+
+	secretName := "cloudflare-warp-cert"
+
+	certSecret, err = w.client.CoreV1().Secrets(w.namespace).Get(secretName, meta_v1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	return certSecret, nil
 }
 
 // obtains the origin cert for a particular hostname
@@ -507,9 +595,11 @@ func (w *WarpController) createTunnel(ingress *v1beta1.Ingress) error {
 		return err
 	}
 	glog.V(5).Infof("creating tunnel for ingress %s", ingress.GetName())
-	serviceName := ingress.Spec.Rules[0].HTTP.Paths[0].Backend.ServiceName
-	servicePort := ingress.Spec.Rules[0].HTTP.Paths[0].Backend.ServicePort
-	hostName := ingress.Spec.Rules[0].Host
+	serviceName := w.getServiceNameForIngress(ingress)
+	servicePort := w.getServicePortForIngress(ingress)
+	hostName := w.getHostNameForIngress(ingress)
+	lbPool := w.getLBPoolForIngress(ingress)
+
 	originCert, err := w.readOriginCert(hostName)
 	if err != nil {
 		return err
@@ -519,6 +609,7 @@ func (w *WarpController) createTunnel(ingress *v1beta1.Ingress) error {
 		ServiceName:      serviceName,
 		ServicePort:      servicePort,
 		ExternalHostname: hostName,
+		LBPool:           lbPool,
 		OriginCert:       originCert,
 	}
 

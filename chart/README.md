@@ -2,16 +2,35 @@
 
 ## Cloudflare Warp
 
-The Cloudflare Warp Ingress Controller makes connections between a Kubernetes service and the Cloudflare edge, exposing an application in your cluster to the internet at a hostname of your choice. A quick description of the details can be found at https://warp.cloudflare.com/quickstart/ and https://github.com/cloudflare/cloudflare-warp-ingress.
+The Cloudflare Warp Ingress Controller makes connections between a Kubernetes
+service and the Cloudflare edge, exposing an application in your cluster to the
+internet at a hostname of your choice. A quick description of the details can be
+found at https://warp.cloudflare.com/quickstart/ and
+https://github.com/cloudflare/cloudflare-warp-ingress.
 
-**Note:** Before installing Cloudflare Warp you need to obtain Cloudflare credentials for your domain zone.
-The credentials are obtained by logging in to https://www.cloudflare.com/a/warp, selecting the zone where you will be publishing your services, and saving the file to local folder.
+**Note:** Before installing Cloudflare Warp you need to obtain Cloudflare
+credentials for your domain zone. The credentials are obtained by logging in to
+https://www.cloudflare.com/a/warp, selecting the zone where you will be
+publishing your services, and saving the file to the home folder.
 
-To deploy Cloudflare Warp Ingress Controller run:
+To deploy Cloudflare Warp Ingress Controller:
 
-```bash
-helm install --name cloudflare-warp-ingress --namespace warp dlc/cloudflare-warp-ingress --set cert=$(cat cloudflare-warp.pem | base64)
 ```
+### set these variables to match your situation
+DOMAIN=mydomain.com
+CERT_B64=$(base64 $HOME/.cloudflare-warp/cert.pem)
+NS="warp"
+USE_RBAC=false
+###
+
+RELEASE_NAME="warp-$DOMAIN"
+
+helm install --name $RELEASE_NAME --namespace $NS \
+   --set rbac.install=$USE_RBAC \
+   --set secret.install=true,secret.domain=$DOMAIN,secret.certificate_b64=$CERT_B64 \
+   chart/
+```
+
 
 Check that pods are running:
 

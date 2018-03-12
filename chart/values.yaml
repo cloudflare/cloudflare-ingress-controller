@@ -27,4 +27,4 @@ rbac:
 secret:
   install: false
   domain: example.co
-  certificate_b64: LS0tLS1CRUdJTiB...
+  certificate_b64: LS0tLS1CRUdJT...insert base64-encoded certificate here

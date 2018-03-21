@@ -16,7 +16,7 @@ each namespace.
 
 To use this, you need:
 - a [Cloudflare](https://www.cloudflare.com/) account (free tier is OK)
-- a zone (domain name) in your Cloudflare account 
+- a zone (domain name) in your Cloudflare account
 - a [Kubernetes](https://kubernetes.io/) cluster
 
 The deployment instructions below use a few YAML files that
@@ -92,22 +92,27 @@ kubectl create -f deploy/cloudflare-warp-rolebinding.yaml
 
 #### Create ingress
 
-An example of an ingress resource can be found in `deploy/nginx-ingress.yaml`.
+An example of deployment, service and ingress resources can be found in `deploy/nginx.yaml` and in `deploy/httpbin.yaml`
 
-Edit it to change:
+Edit these files to change:
 - the `host` to be used (this can be any name under the zone that you
   picked during the `cloudflare-warp login` process earlier)
 - the `serviceName` that you want to expose (and the port number if
   it is different)
 
-Then create the ingress resource.
+Then create the resources.
 
 ```
-kubectl create -f deploy/nginx-ingress.yaml
+kubectl create -f deploy/nginx.yaml
+kubectl create -f deploy/httpbin.yaml
+```
+
+Inspect the ingress
+```
+kubectl get ingress
 ```
 
 You should now be able to access that service using the specified URL.
-
 
 #### Troubleshooting
 
@@ -117,6 +122,26 @@ If things don't work as expected, check the logs of the controller.
 kubectl logs deploy/warp-controller
 ```
 
+### Installation with helm
+
+The [helm]](https://docs.helm.sh/) tool can be use to quickly install the warp
+ingress controller into your kubernetes cluster. The helm chart in this
+repository can be used directly, overriding only a couple of default values. As
+before, you must have a valid cloudflare warp certificate for your domain. The
+RBAC flag must be set correctly to match your cluster.
+
+```
+DOMAIN=mydomain.com
+CERT_B64=$(base64 $HOME/.cloudflare-warp/cert.pem)
+NAME="warp-$DOMAIN"
+NS="default"
+USE_RBAC=false
+
+helm install --name $NAME --namespace $NS \
+   --set rbac.install=$USE_RBAC \
+   --set secret.install=true,secret.domain=$DOMAIN,secret.certificate_b64=$CERT_B64 \
+   chart/
+```
 
 ## Notes
 
@@ -143,7 +168,7 @@ need to do both of the following:
   `set-context`, or whatever you prefer)
 - edit `deploy/warp-controller-deployment.yaml` to specify the
   namespace you want to use on the controller command line using the `-namespace` flag
-  
+
 For example, to manage ingress resources in the `blue` namespace, the `command:` block in your `warp-controller-deployment.yaml` should look like the one below:
 
 ```yaml
@@ -152,7 +177,7 @@ For example, to manage ingress resources in the `blue` namespace, the `command:`
   - -v=6
   - -namespace=blue
 ```
-and could be deployed using 
+and could be deployed using
 ```
 kubectl create --namespace blue -f deploy/warp-controller-deployment.yaml
 ```
@@ -166,28 +191,18 @@ ingress with matching annotation is created, a tunnel-management
 object is created to match it. The life-cycle of this tunnel-management
 object matches the life-cycle of the ingress.
 
-When a service and at least one endpoint exist to match that ingress,
-the Warp tunnel is created to route traffic though to the kubernetes
-service, using kubernetes service-load-balancing to distribute traffic to
-the endpoints.
+When a service and at least one endpoint exist to match that ingress, the Warp
+tunnel is created to route traffic though to the kubernetes service, using
+kubernetes service-load-balancing to distribute traffic to the endpoints.
 
-The controller manages ingresses and services only in its own namespace.
-This restriction matches the normal kubernetes security boundary, along
-with the assumption that a cloudflare account is associated
-with a namespace.
+The controller manages ingresses and services only in its own namespace. This
+restriction matches the normal kubernetes security boundary, along with the
+assumption that a cloudflare account is associated with a namespace.
 
-There are two implementiations of the Tunnel interface.  The
-TunnelPodManager manages a pod that runs the Warp client code.  This
-pod has the cloudflare credentials configmap mounted into it, and
-arguments passed to the commandline. When the ingress and service
-and endpoints are present, the pod is created.  When the service or
-endpoints are absent, the pod is destroyed.
-
-The second implementation is the WarpManager, which runs the tunnel
-connection in-process as a goroutine.  The tunel connection lifecycle is
-matches the lifecycle of the service and endpoints, starting and stopping
-when the backend service and endpoints are available or unavailable.
-
+There is one implementiations of the Tunnel interface, the WarpManager, which
+runs the tunnel connection in-process as a goroutine.  The tunnel connection
+lifecycle is matches the lifecycle of the service and endpoints, starting and
+stopping when the backend service and endpoints are available or unavailable.
 
 ## Developing
 

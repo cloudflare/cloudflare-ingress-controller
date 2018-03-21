@@ -63,7 +63,7 @@ items:
       warp.cloudflare.com/lb-pool: nginx.pool
   spec:
     rules:
-    - host: nginx.anthopleura.net
+    - host: nginx.example.co
       http:
         paths:
         - backend:

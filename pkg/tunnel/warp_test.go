@@ -11,6 +11,7 @@ func TestWarpConfig(t *testing.T) {
 
 	config := &Config{
 		ServiceName:      "service",
+		ServiceNamespace: "default",
 		ServicePort:      intstr.FromInt(6000),
 		ExternalHostname: "acme.example.com",
 		LBPool:           "abc123",

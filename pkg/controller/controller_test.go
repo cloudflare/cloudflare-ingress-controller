@@ -30,6 +30,149 @@ func init() {
 	glog.V(2).Infof("initializing test")
 }
 
+type serviceKeyCheck struct {
+	queueKey, operation, namespace, name string
+	service                              *v1.Service
+}
+
+func checkServiceKey(t *testing.T, check serviceKeyCheck) {
+	parsedOp, parsedNS, parsedName := parseServiceKey(check.queueKey)
+	assert.Equal(t, check.operation, parsedOp)
+	assert.Equal(t, check.namespace, parsedNS)
+	assert.Equal(t, check.name, parsedName)
+	assert.Equal(t, check.queueKey, check.operation+":"+constructServiceKey(check.service))
+}
+
+func TestServiceKey(t *testing.T) {
+
+	checks := []serviceKeyCheck{
+		serviceKeyCheck{
+			"add:default/nginx",
+			"add",
+			"default",
+			"nginx",
+			&v1.Service{
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name:      "nginx",
+					Namespace: "default",
+				},
+			},
+		},
+		serviceKeyCheck{
+			"delete:acme/nginx",
+			"delete",
+			"acme",
+			"nginx",
+			&v1.Service{
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name:      "nginx",
+					Namespace: "acme",
+				},
+			},
+		},
+		serviceKeyCheck{
+			"update:acme/nginx",
+			"update",
+			"acme",
+			"nginx",
+			&v1.Service{
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name:      "nginx",
+					Namespace: "acme",
+				},
+			},
+		},
+	}
+
+	for _, c := range checks {
+		checkServiceKey(t, c)
+	}
+}
+
+type ingressKeyCheck struct {
+	queueKey, operation, namespace, ingressName, serviceName string
+	ingress                                                  *v1beta1.Ingress
+}
+
+func checkIngressKey(t *testing.T, check ingressKeyCheck) {
+	parsedOp, parsedNS, parsedIngressName, parsedServiceName := parseIngressKey(check.queueKey)
+	assert.Equal(t, check.operation, parsedOp)
+	assert.Equal(t, check.namespace, parsedNS)
+	assert.Equal(t, check.serviceName, parsedServiceName)
+	assert.Equal(t, check.ingressName, parsedIngressName)
+	assert.Equal(t, check.queueKey, check.operation+":"+constructIngressKey(check.ingress))
+}
+
+func TestIngressKey(t *testing.T) {
+
+	ingressSpecNginx := v1beta1.IngressSpec{
+		Rules: []v1beta1.IngressRule{
+			v1beta1.IngressRule{
+				IngressRuleValue: v1beta1.IngressRuleValue{
+					HTTP: &v1beta1.HTTPIngressRuleValue{
+						Paths: []v1beta1.HTTPIngressPath{
+							v1beta1.HTTPIngressPath{
+								Backend: v1beta1.IngressBackend{
+									ServiceName: "nginx",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	checks := []ingressKeyCheck{
+		ingressKeyCheck{
+			"add:default/nginx-in/nginx",
+			"add",
+			"default",
+			"nginx-in",
+			"nginx",
+			&v1beta1.Ingress{
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name:      "nginx-in",
+					Namespace: "default",
+				},
+				Spec: ingressSpecNginx,
+			},
+		},
+		ingressKeyCheck{
+			"delete:acme/nginx-in/nginx",
+			"delete",
+			"acme",
+			"nginx-in",
+			"nginx",
+			&v1beta1.Ingress{
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name:      "nginx-in",
+					Namespace: "acme",
+				},
+				Spec: ingressSpecNginx,
+			},
+		},
+		ingressKeyCheck{
+			"update:acme/nginx-in/nginx",
+			"update",
+			"acme",
+			"nginx-in",
+			"nginx",
+			&v1beta1.Ingress{
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name:      "nginx-in",
+					Namespace: "acme",
+				},
+				Spec: ingressSpecNginx,
+			},
+		},
+	}
+
+	for _, c := range checks {
+		checkIngressKey(t, c)
+	}
+}
+
 func TestSimple(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	nothingPod := v1.Pod{}
@@ -50,7 +193,7 @@ func TestSimple(t *testing.T) {
 }
 
 func TestAction(t *testing.T) {
-	namespace := "test-namespace"
+	serviceNamespace := "acme"
 	fakeClient := &fake.Clientset{}
 	actualPod := v1.Pod{
 		ObjectMeta: meta_v1.ObjectMeta{
@@ -67,7 +210,7 @@ func TestAction(t *testing.T) {
 	})
 
 	podResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
-	getPodAction := ktesting.NewGetAction(podResource, "pods", namespace)
+	getPodAction := ktesting.NewGetAction(podResource, "pods", serviceNamespace)
 	podObject, err := fakeClient.Invokes(getPodAction, &v1.Pod{})
 
 	assert.True(t, called)
@@ -81,9 +224,9 @@ func TestAction(t *testing.T) {
 }
 
 func TestNewWarpController(t *testing.T) {
-	namespace := "test-namespace"
+	controllerNamespace := "cloudflare" // "cloudflare"
 	fakeClient := &fake.Clientset{}
-	wc := NewWarpController(fakeClient, namespace)
+	wc := NewWarpController(fakeClient, controllerNamespace)
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -91,7 +234,7 @@ func TestNewWarpController(t *testing.T) {
 	// wait for cache sync
 	time.Sleep(time.Second)
 
-	assert.Equal(t, wc.namespace, namespace)
+	assert.Equal(t, wc.namespace, controllerNamespace)
 	assert.NotNil(t, wc.tunnels)
 	assert.Equal(t, 0, len(wc.tunnels))
 }
@@ -141,7 +284,7 @@ func getTunnelItems(namespace string) tunnelItems {
 
 	service := v1.Service{
 		ObjectMeta: meta_v1.ObjectMeta{
-			Name:      ingressName,
+			Name:      serviceName,
 			Namespace: namespace,
 		},
 	}
@@ -165,10 +308,11 @@ func getTunnelItems(namespace string) tunnelItems {
 func TestControllerLookups(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 
-	namespace := "test-namespace"
-	items := getTunnelItems(namespace)
+	serviceNamespace := "acme"
+	controllerNamespace := "cloudflare" // "cloudflare"
+	items := getTunnelItems(serviceNamespace)
 
-	wc := NewWarpController(fakeClient, namespace)
+	wc := NewWarpController(fakeClient, controllerNamespace)
 
 	// broken for now
 	// assert.Equal(t, "fooservice", wc.getServiceNameForIngress(&items.Ingress))
@@ -176,15 +320,16 @@ func TestControllerLookups(t *testing.T) {
 	assert.Equal(t, "test.example.com", wc.getHostNameForIngress(&items.Ingress))
 	assert.Equal(t, int32(80), wc.getServicePortForIngress(&items.Ingress).IntVal)
 
-	// assert.Equal(t, "fooservice.test-namespace", wc.getLBPoolForIngress(&items.Ingress))
+	// assert.Equal(t, "fooservice.acme", wc.getLBPoolForIngress(&items.Ingress))
 	assert.Equal(t, "test.example.com", wc.getLBPoolForIngress(&items.Ingress))
 }
 
 func TestTunnelInitialization(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 
-	namespace := "test-namespace"
-	items := getTunnelItems(namespace)
+	serviceNamespace := "acme"
+	controllerNamespace := "cloudflare" // "cloudflare"
+	items := getTunnelItems(serviceNamespace)
 
 	fakeClient.Fake.AddReactor("list", "ingresses", func(action ktesting.Action) (bool, runtime.Object, error) {
 		glog.Infof("list is called on ingresses")
@@ -208,7 +353,7 @@ func TestTunnelInitialization(t *testing.T) {
 	fakeClient.Fake.AddWatchReactor("ingresses", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 	fakeClient.Fake.AddWatchReactor("ingresses", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 
-	wc := NewWarpController(fakeClient, namespace)
+	wc := NewWarpController(fakeClient, controllerNamespace)
 	// wc.EnableMetrics()cw
 
 	stopCh := make(chan struct{})
@@ -218,12 +363,18 @@ func TestTunnelInitialization(t *testing.T) {
 	// wait for cache sync
 	time.Sleep(time.Second)
 
-	assert.Equal(t, wc.namespace, namespace)
+	assert.Equal(t, wc.namespace, controllerNamespace)
+	if wc.tunnels == nil {
+		t.Fatal("failing, tunnels is nil")
+	}
 	assert.NotNil(t, wc.tunnels)
 	assert.Equal(t, 1, len(wc.tunnels))
 
-	fooTunnel := wc.tunnels["fooservice"]
-	assert.NotNil(t, fooTunnel)
+	key := constructServiceKey(&items.Service)
+	fooTunnel := wc.tunnels[key]
+	if fooTunnel == nil {
+		t.Fatalf("failing, tunnel is nil for %s", key)
+	}
 	assert.False(t, fooTunnel.Active())
 	assert.Equal(t, "test.example.com", fooTunnel.Config().ExternalHostname)
 	assert.Equal(t, "fooservice", fooTunnel.Config().ServiceName)
@@ -234,8 +385,10 @@ func TestTunnelInitialization(t *testing.T) {
 func TestTunnelServiceInitialization(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 
-	namespace := "test-namespace"
-	items := getTunnelItems(namespace)
+	controllerNamespace := "cloudflare" // "cloudflare"
+	serviceNamespace := "acme"
+
+	items := getTunnelItems(serviceNamespace)
 
 	fakeClient.Fake.AddReactor("list", "ingresses", func(action ktesting.Action) (bool, runtime.Object, error) {
 		return true, &v1beta1.IngressList{
@@ -255,7 +408,7 @@ func TestTunnelServiceInitialization(t *testing.T) {
 
 	fakeClient.Fake.AddWatchReactor("*", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 
-	wc := NewWarpController(fakeClient, namespace)
+	wc := NewWarpController(fakeClient, controllerNamespace)
 	// wc.EnableMetrics()cw
 
 	stopCh := make(chan struct{})
@@ -273,20 +426,111 @@ func TestTunnelServiceInitialization(t *testing.T) {
 	})
 	//  does invoking a create action trigger the watch?
 	serviceResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "services"}
-	getServiceAction := ktesting.NewCreateAction(serviceResource, namespace, &items.Service)
+	getServiceAction := ktesting.NewCreateAction(serviceResource, serviceNamespace, &items.Service)
 	_, _ = fakeClient.Invokes(getServiceAction, &v1.Service{})
 
 	time.Sleep(5 * time.Second)
 
-	assert.Equal(t, wc.namespace, namespace)
-	assert.NotNil(t, wc.tunnels)
+	assert.Equal(t, wc.namespace, controllerNamespace)
+	if wc.tunnels == nil {
+		t.Fatal("failing, tunnels is nil")
+	}
 	assert.Equal(t, 1, len(wc.tunnels))
 
-	fooTunnel := wc.tunnels["fooservice"]
-	assert.NotNil(t, fooTunnel)
+	key := constructServiceKey(&items.Service)
+	fooTunnel := wc.tunnels[key]
+	if fooTunnel == nil {
+		t.Fatalf("failing, tunnel is nil for %s", key)
+	}
 	assert.False(t, fooTunnel.Active())
 	assert.Equal(t, "test.example.com", fooTunnel.Config().ExternalHostname)
 	assert.Equal(t, "fooservice", fooTunnel.Config().ServiceName)
 	assert.Equal(t, int32(80), fooTunnel.Config().ServicePort.IntVal)
 
+}
+
+func TestTunnelServicesTwoNS(t *testing.T) {
+	fakeClient := &fake.Clientset{}
+
+	controllerNamespace := "cloudflare" // "cloudflare"
+
+	items := []tunnelItems{getTunnelItems("target"), getTunnelItems("walmart")}
+
+	fakeClient.Fake.AddReactor("list", "ingresses", func(action ktesting.Action) (bool, runtime.Object, error) {
+		return true, &v1beta1.IngressList{
+			Items: []v1beta1.Ingress{items[0].Ingress, items[1].Ingress},
+		}, nil
+	})
+	fakeClient.Fake.AddReactor("get", "ingresses", func(action ktesting.Action) (bool, runtime.Object, error) {
+		switch action.GetNamespace() {
+		case items[0].Ingress.GetNamespace():
+			return true, &items[0].Ingress, nil
+		case items[1].Ingress.GetNamespace():
+			return true, &items[1].Ingress, nil
+		default:
+			return true, nil, fmt.Errorf("bad test namespace %s", action.GetNamespace())
+		}
+	})
+	fakeClient.Fake.AddReactor("get", "services", func(action ktesting.Action) (bool, runtime.Object, error) {
+		switch action.GetNamespace() {
+		case items[0].Ingress.GetNamespace():
+			return true, &items[0].Service, nil
+		case items[1].Ingress.GetNamespace():
+			return true, &items[1].Service, nil
+		default:
+			return true, nil, fmt.Errorf("bad test namespace %s", action.GetNamespace())
+		}
+	})
+
+	fakeClient.Fake.AddReactor("get", "secrets", func(action ktesting.Action) (bool, runtime.Object, error) {
+		switch action.GetNamespace() {
+		case controllerNamespace:
+			return true, &items[0].Certificate, nil
+		default:
+			return true, nil, fmt.Errorf("bad test namespace %s", action.GetNamespace())
+		}
+	})
+
+	fakeClient.Fake.AddWatchReactor("*", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
+
+	wc := NewWarpController(fakeClient, controllerNamespace)
+	// wc.EnableMetrics()cw
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	go wc.Run(stopCh)
+
+	// wait for cache sync
+	time.Sleep(time.Second)
+
+	// add the service now
+	fakeClient.Fake.AddReactor("list", "services", func(action ktesting.Action) (bool, runtime.Object, error) {
+		return true, &v1.ServiceList{
+			Items: []v1.Service{items[0].Service},
+		}, nil
+	})
+	//  does invoking a create action trigger the watch?
+	serviceResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "services"}
+	getServiceAction := ktesting.NewCreateAction(serviceResource, items[0].Ingress.GetNamespace(), &items[0].Service)
+	_, _ = fakeClient.Invokes(getServiceAction, &v1.Service{})
+
+	time.Sleep(5 * time.Second)
+
+	assert.Equal(t, wc.namespace, controllerNamespace)
+	if wc.tunnels == nil {
+		t.Fatal("failing, tunnels is nil")
+	}
+	assert.Equal(t, 2, len(wc.tunnels))
+
+	for _, item := range items {
+		key := constructServiceKey(&item.Service)
+		tunnel := wc.tunnels[key]
+		if tunnel == nil {
+			t.Fatalf("failing, tunnel is nil for %s", key)
+		}
+		assert.False(t, tunnel.Active())
+		assert.Equal(t, "test.example.com", tunnel.Config().ExternalHostname)
+		assert.Equal(t, "fooservice", tunnel.Config().ServiceName)
+		assert.Equal(t, int32(80), tunnel.Config().ServicePort.IntVal)
+	}
 }

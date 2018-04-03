@@ -1,8 +1,7 @@
-{{ if .Values.rbac.install }}
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
-  name:  {{ .Values.rbac.roleName }}
+  name: cloudflare-warp
 rules:
 - apiGroups:
   - ""
@@ -21,4 +20,3 @@ rules:
   - list
   - get
   - watch
-{{ end }}

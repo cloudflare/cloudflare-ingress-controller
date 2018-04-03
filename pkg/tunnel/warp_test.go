@@ -3,6 +3,7 @@ package tunnel
 import (
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -17,7 +18,12 @@ func TestWarpConfig(t *testing.T) {
 		LBPool:           "abc123",
 		OriginCert:       []byte("this is not a cert"),
 	}
-	metricsConfig := NewDummyMetrics()
+
+	defaultRegistry := prometheus.NewRegistry()
+	prometheus.DefaultRegisterer = defaultRegistry
+	prometheus.DefaultGatherer = defaultRegistry
+
+	metricsConfig := NewMetrics()
 
 	mgr, err := NewWarpManager(config, metricsConfig)
 	assert.Nil(t, err)

@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/cloudflare/cloudflare-warp-ingress/pkg/cloudflare"
-	"github.com/cloudflare/cloudflare-warp/origin"
-	tunnelpogs "github.com/cloudflare/cloudflare-warp/tunnelrpc/pogs"
+	"github.com/cloudflare/cloudflared/origin"
+	tunnelpogs "github.com/cloudflare/cloudflared/tunnelrpc/pogs"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 
 	log "github.com/sirupsen/logrus"

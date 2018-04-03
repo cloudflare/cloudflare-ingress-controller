@@ -33,7 +33,7 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/cloudflare/cloudflare-warp"
+  name = "github.com/cloudflare/cloudflared"
   packages = [
     "h2mux",
     "origin",
@@ -42,7 +42,7 @@
     "validation",
     "websocket"
   ]
-  revision = "96dd6cc3a0e837a62ba8e8ffa46418a6fdec2f38"
+  revision = "4153b708a40bcab48b8eabd3536d48450df5fc77"
 
 [[projects]]
   name = "github.com/davecgh/go-spew"
@@ -142,6 +142,12 @@
   ]
   revision = "1adfc126b41513cc696b209667c8656ea7aac67c"
   version = "v1.0.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/golang-collections/collections"
+  packages = ["queue"]
+  revision = "604e922904d35e97f98a774db7881f049cd8d970"
 
 [[projects]]
   branch = "master"
@@ -538,6 +544,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "0c7c6809263e239eca8106978f852a13a094f0e885f4c0498a1e44cb70d6d8bb"
+  inputs-digest = "b2eae0471f5b3a3243afc5cfdddf3ede7b387380eba92232bcc912470def5ce9"
   solver-name = "gps-cdcl"
   solver-version = 1

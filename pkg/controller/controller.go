@@ -65,7 +65,6 @@ func NewWarpController(client kubernetes.Interface, namespace string) *WarpContr
 	w := &WarpController{
 		client: client,
 
-		// for testing initialize with dummy metrics object
 		metricsConfig: tunnel.NewDummyMetrics(),
 
 		ingressInformer:  informer,
@@ -92,10 +91,10 @@ func createIngressInformer(client kubernetes.Interface) (cache.Controller, cache
 
 		&cache.ListWatch{
 			ListFunc: func(lo meta_v1.ListOptions) (runtime.Object, error) {
-				return client.ExtensionsV1beta1().Ingresses("").List(lo)
+				return client.ExtensionsV1beta1().Ingresses(v1.NamespaceAll).List(lo)
 			},
 			WatchFunc: func(lo meta_v1.ListOptions) (watch.Interface, error) {
-				return client.ExtensionsV1beta1().Ingresses("").Watch(lo)
+				return client.ExtensionsV1beta1().Ingresses(v1.NamespaceAll).Watch(lo)
 			},
 		},
 
@@ -177,10 +176,10 @@ func (w *WarpController) configureServiceInformer() {
 
 		&cache.ListWatch{
 			ListFunc: func(lo meta_v1.ListOptions) (runtime.Object, error) {
-				return w.client.CoreV1().Services("").List(lo)
+				return w.client.CoreV1().Services(v1.NamespaceAll).List(lo)
 			},
 			WatchFunc: func(lo meta_v1.ListOptions) (watch.Interface, error) {
-				return w.client.CoreV1().Services("").Watch(lo)
+				return w.client.CoreV1().Services(v1.NamespaceAll).Watch(lo)
 			},
 		},
 
@@ -238,10 +237,10 @@ func (w *WarpController) configureEndpointInformer() {
 
 		&cache.ListWatch{
 			ListFunc: func(lo meta_v1.ListOptions) (runtime.Object, error) {
-				return w.client.CoreV1().Endpoints("").List(lo)
+				return w.client.CoreV1().Endpoints(v1.NamespaceAll).List(lo)
 			},
 			WatchFunc: func(lo meta_v1.ListOptions) (watch.Interface, error) {
-				return w.client.CoreV1().Endpoints("").Watch(lo)
+				return w.client.CoreV1().Endpoints(v1.NamespaceAll).Watch(lo)
 			},
 		},
 
@@ -682,7 +681,7 @@ func (w *WarpController) startOrStop(namespace, serviceName string) error {
 		if port == 0 {
 			return fmt.Errorf("Unable to match port %s to service %s", ingressServicePort.String(), key)
 		}
-		url := fmt.Sprintf("%s.%s:%d", service.ObjectMeta.Namespace, service.ObjectMeta.Name, port)
+		url := fmt.Sprintf("%s.%s:%d", service.ObjectMeta.Name, service.ObjectMeta.Namespace, port)
 		glog.V(5).Infof("Starting tunnel to url %s", url)
 		return t.Start(url)
 	}

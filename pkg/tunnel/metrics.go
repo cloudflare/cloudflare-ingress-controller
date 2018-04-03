@@ -3,7 +3,7 @@ package tunnel
 import (
 	"time"
 
-	"github.com/cloudflare/cloudflare-warp/origin"
+	"github.com/cloudflare/cloudflared/origin"
 )
 
 // MetricsConfig wraps the cloudflare-warp tunnel metrics in a struct
@@ -13,8 +13,9 @@ type MetricsConfig struct {
 }
 
 // NewMetrics created a set of TunnelMetrics,
-// initializes global prometheus objects which breaks tests
+// allows global prometheus objects, which breaks tests
 func NewMetrics() *MetricsConfig {
+
 	return &MetricsConfig{
 		Metrics:         origin.NewTunnelMetrics(),
 		UpdateFrequency: 5 * time.Second,
@@ -25,6 +26,7 @@ func NewMetrics() *MetricsConfig {
 // full of default zero values
 // does not initializs prometheus and is acceptable for tests
 func NewDummyMetrics() *MetricsConfig {
+
 	return &MetricsConfig{
 		Metrics:         &origin.TunnelMetrics{},
 		UpdateFrequency: 10000 * time.Hour,

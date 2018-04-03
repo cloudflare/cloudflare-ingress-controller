@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"flag"
 	"fmt"
 	"testing"
 	"time"
@@ -8,7 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -21,21 +21,13 @@ import (
 )
 
 func init() {
-	// flag.Set("alsologtostderr", fmt.Sprintf("%t", true))
-	// var logLevel string
-	// flag.StringVar(&logLevel, "logLevel", "6", "test")
-	// flag.Lookup("v").Value.Set(logLevel)
+	flag.Set("alsologtostderr", fmt.Sprintf("%t", true))
+	var logLevel string
+	flag.StringVar(&logLevel, "logLevel", "6", "test")
+	flag.Lookup("v").Value.Set(logLevel)
 
-	// flag.Parse()
-	// glog.V(2).Infof("initializing test")
-}
-
-func resetPrometheusGlobalRegisterer() {
-	// try a ugly alternative workaround to how cloudflared
-	// initializes and uses the global prometheus registry
-	defaultRegistry := prometheus.NewRegistry()
-	prometheus.DefaultRegisterer = defaultRegistry
-	prometheus.DefaultGatherer = defaultRegistry
+	flag.Parse()
+	glog.V(2).Infof("initializing test")
 }
 
 type serviceKeyCheck struct {
@@ -234,7 +226,7 @@ func TestAction(t *testing.T) {
 func TestNewWarpController(t *testing.T) {
 	controllerNamespace := "cloudflare" // "cloudflare"
 	fakeClient := &fake.Clientset{}
-	resetPrometheusGlobalRegisterer()
+
 	wc := NewWarpController(fakeClient, controllerNamespace)
 
 	stopCh := make(chan struct{})
@@ -320,7 +312,7 @@ func TestControllerLookups(t *testing.T) {
 	serviceNamespace := "acme"
 	controllerNamespace := "cloudflare" // "cloudflare"
 	items := getTunnelItems(serviceNamespace)
-	resetPrometheusGlobalRegisterer()
+
 	wc := NewWarpController(fakeClient, controllerNamespace)
 
 	// broken for now
@@ -362,7 +354,6 @@ func TestTunnelInitialization(t *testing.T) {
 	fakeClient.Fake.AddWatchReactor("ingresses", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 	fakeClient.Fake.AddWatchReactor("ingresses", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 
-	resetPrometheusGlobalRegisterer()
 	wc := NewWarpController(fakeClient, controllerNamespace)
 	// wc.EnableMetrics()cw
 
@@ -418,7 +409,6 @@ func TestTunnelServiceInitialization(t *testing.T) {
 
 	fakeClient.Fake.AddWatchReactor("*", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 
-	resetPrometheusGlobalRegisterer()
 	wc := NewWarpController(fakeClient, controllerNamespace)
 	// wc.EnableMetrics()cw
 
@@ -504,7 +494,6 @@ func TestTunnelServicesTwoNS(t *testing.T) {
 
 	fakeClient.Fake.AddWatchReactor("*", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 
-	resetPrometheusGlobalRegisterer()
 	wc := NewWarpController(fakeClient, controllerNamespace)
 	// wc.EnableMetrics()cw
 

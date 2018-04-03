@@ -32,6 +32,7 @@ type Tunnel interface {
 // a warp tunnel
 type Config struct {
 	ServiceName      string
+	ServiceNamespace string
 	ServicePort      intstr.IntOrString // maps either to service.Name (string) or service.Port (int32)
 	ExternalHostname string
 	LBPool           string

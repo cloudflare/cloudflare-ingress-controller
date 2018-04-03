@@ -38,6 +38,6 @@
   name = "k8s.io/client-go"
   version = "4.0.0"
 
-[[constraint]]
-  branch = "master"
-  name = "github.com/cloudflare/cloudflare-warp"
+# [[constraint]]
+#   branch = "master"
+#   name = "github.com/cloudflare/cloudflare-warp"

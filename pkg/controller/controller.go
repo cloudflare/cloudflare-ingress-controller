@@ -59,13 +59,12 @@ type WarpController struct {
 
 func NewWarpController(client kubernetes.Interface, namespace string) *WarpController {
 
-	informer, indexer, queue := createIngressInformer(client, namespace)
+	informer, indexer, queue := createIngressInformer(client)
 	tunnels := make(map[string]tunnel.Tunnel, 0)
 
 	w := &WarpController{
 		client: client,
 
-		// for testing initialize with dummy metrics object
 		metricsConfig: tunnel.NewDummyMetrics(),
 
 		ingressInformer:  informer,
@@ -86,16 +85,16 @@ func (w *WarpController) EnableMetrics() {
 	w.metricsConfig = tunnel.NewMetrics()
 }
 
-func createIngressInformer(client kubernetes.Interface, namespace string) (cache.Controller, cache.Indexer, workqueue.RateLimitingInterface) {
+func createIngressInformer(client kubernetes.Interface) (cache.Controller, cache.Indexer, workqueue.RateLimitingInterface) {
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	indexer, informer := cache.NewIndexerInformer(
 
 		&cache.ListWatch{
 			ListFunc: func(lo meta_v1.ListOptions) (runtime.Object, error) {
-				return client.ExtensionsV1beta1().Ingresses(namespace).List(lo)
+				return client.ExtensionsV1beta1().Ingresses(v1.NamespaceAll).List(lo)
 			},
 			WatchFunc: func(lo meta_v1.ListOptions) (watch.Interface, error) {
-				return client.ExtensionsV1beta1().Ingresses(namespace).Watch(lo)
+				return client.ExtensionsV1beta1().Ingresses(v1.NamespaceAll).Watch(lo)
 			},
 		},
 
@@ -131,7 +130,7 @@ func createIngressInformer(client kubernetes.Interface, namespace string) (cache
 }
 
 // check the type, annotation and conditions.  Return key, ok
-// key is: ingressname+"/"+servicename
+// key is: namespace+"/"+ingressname+"/"+serviceName
 // allows lookup by either the ingress name or the service name
 func shouldHandleIngress(obj interface{}) (string, bool) {
 
@@ -168,7 +167,7 @@ func shouldHandleIngress(obj interface{}) (string, bool) {
 		glog.V(2).Infof("Cannot create tunnel for ingress with multiple paths")
 		return "", false
 	}
-	return fmt.Sprintf("%s/%s", ingress.ObjectMeta.Name, ingress.Spec.Rules[0].HTTP.Paths[0].Backend.ServiceName), true
+	return constructIngressKey(ingress), true
 }
 
 func (w *WarpController) configureServiceInformer() {
@@ -177,10 +176,10 @@ func (w *WarpController) configureServiceInformer() {
 
 		&cache.ListWatch{
 			ListFunc: func(lo meta_v1.ListOptions) (runtime.Object, error) {
-				return w.client.CoreV1().Services(w.namespace).List(lo)
+				return w.client.CoreV1().Services(v1.NamespaceAll).List(lo)
 			},
 			WatchFunc: func(lo meta_v1.ListOptions) (watch.Interface, error) {
-				return w.client.CoreV1().Services(w.namespace).Watch(lo)
+				return w.client.CoreV1().Services(v1.NamespaceAll).Watch(lo)
 			},
 		},
 
@@ -197,21 +196,21 @@ func (w *WarpController) configureServiceInformer() {
 				if !ok || !w.isWatchedService(svc) {
 					return
 				}
-				queue.Add("add:" + svc.ObjectMeta.Name)
+				queue.Add("add:" + constructServiceKey(svc))
 			},
 			UpdateFunc: func(old, new interface{}) {
 				svc, ok := new.(*v1.Service)
 				if !ok || !w.isWatchedService(svc) {
 					return
 				}
-				queue.Add("update:" + svc.ObjectMeta.Name)
+				queue.Add("update:" + constructServiceKey(svc))
 			},
 			DeleteFunc: func(obj interface{}) {
 				svc, ok := obj.(*v1.Service)
 				if !ok || !w.isWatchedService(svc) {
 					return
 				}
-				queue.Add("delete:" + svc.ObjectMeta.Name)
+				queue.Add("delete:" + constructServiceKey(svc))
 			},
 		},
 		cache.Indexers{},
@@ -224,7 +223,7 @@ func (w *WarpController) configureServiceInformer() {
 // is this service one of the ones we have a tunnel for?
 func (w *WarpController) isWatchedService(service *v1.Service) bool {
 	for _, tunnel := range w.tunnels {
-		if service.ObjectMeta.Name == tunnel.Config().ServiceName {
+		if service.ObjectMeta.Name == tunnel.Config().ServiceName && service.ObjectMeta.Namespace == tunnel.Config().ServiceNamespace {
 			glog.V(5).Infof("Watching service %s/%s", service.ObjectMeta.Namespace, service.ObjectMeta.Name)
 			return true
 		}
@@ -238,10 +237,10 @@ func (w *WarpController) configureEndpointInformer() {
 
 		&cache.ListWatch{
 			ListFunc: func(lo meta_v1.ListOptions) (runtime.Object, error) {
-				return w.client.CoreV1().Endpoints(w.namespace).List(lo)
+				return w.client.CoreV1().Endpoints(v1.NamespaceAll).List(lo)
 			},
 			WatchFunc: func(lo meta_v1.ListOptions) (watch.Interface, error) {
-				return w.client.CoreV1().Endpoints(w.namespace).Watch(lo)
+				return w.client.CoreV1().Endpoints(v1.NamespaceAll).Watch(lo)
 			},
 		},
 
@@ -251,28 +250,28 @@ func (w *WarpController) configureEndpointInformer() {
 		// The resync period of this object.
 		60*time.Second,
 
-		// Queue all these changes as an update to the service using the endpoint name == service name
+		// Queue all these changes as an update to the service using the endpoint ns/name == service ns/name
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				ep, ok := obj.(*v1.Endpoints)
 				if !ok || !w.isWatchedEndpoint(ep) {
 					return
 				}
-				w.serviceWorkqueue.Add("update:" + ep.ObjectMeta.Name)
+				w.serviceWorkqueue.Add("update:" + constructEndpointKey(ep))
 			},
 			UpdateFunc: func(old, new interface{}) {
 				ep, ok := new.(*v1.Endpoints)
 				if !ok || !w.isWatchedEndpoint(ep) {
 					return
 				}
-				w.serviceWorkqueue.Add("update:" + ep.ObjectMeta.Name)
+				w.serviceWorkqueue.Add("update:" + constructEndpointKey(ep))
 			},
 			DeleteFunc: func(obj interface{}) {
 				ep, ok := obj.(*v1.Endpoints)
 				if !ok || !w.isWatchedEndpoint(ep) {
 					return
 				}
-				w.serviceWorkqueue.Add("update:" + ep.ObjectMeta.Name)
+				w.serviceWorkqueue.Add("update:" + constructEndpointKey(ep))
 			},
 		},
 		cache.Indexers{},
@@ -342,38 +341,65 @@ func (w *WarpController) processNextIngress() bool {
 	return true
 }
 
-func parseIngressKey(queueKey string) (string, string, string) {
+func constructServiceKey(service *v1.Service) string {
+	return fmt.Sprintf("%s/%s", service.ObjectMeta.Namespace, service.ObjectMeta.Name)
+}
+
+func constructEndpointKey(ep *v1.Endpoints) string {
+	return fmt.Sprintf("%s/%s", ep.ObjectMeta.Namespace, ep.ObjectMeta.Name)
+}
+
+func parseServiceKey(queueKey string) (string, string, string) {
 
 	identifiers := strings.SplitN(queueKey, ":", 2)
 	op := identifiers[0]
 	key := identifiers[1]
 
 	identifiers = strings.SplitN(key, "/", 2)
-	ingressname := identifiers[0]
-	servicename := identifiers[1]
+	namespace := identifiers[0]
+	serviceName := identifiers[1]
 
-	return op, ingressname, servicename
+	return op, namespace, serviceName
+}
+
+func constructIngressKey(ingress *v1beta1.Ingress) string {
+	return fmt.Sprintf("%s/%s/%s", ingress.ObjectMeta.Namespace, ingress.ObjectMeta.Name, ingress.Spec.Rules[0].HTTP.Paths[0].Backend.ServiceName)
+}
+
+func parseIngressKey(queueKey string) (string, string, string, string) {
+
+	identifiers := strings.SplitN(queueKey, ":", 2)
+	op := identifiers[0]
+	key := identifiers[1]
+
+	identifiers = strings.SplitN(key, "/", 3)
+	namespace := identifiers[0]
+	ingressName := identifiers[1]
+	serviceName := identifiers[2]
+
+	return op, namespace, ingressName, serviceName
 }
 
 func (w *WarpController) processIngress(queueKey string) error {
 
-	op, ingressname, servicename := parseIngressKey(queueKey)
+	op, namespace, ingressname, serviceName := parseIngressKey(queueKey)
+	key := namespace + "/" + serviceName
 
 	switch op {
 
 	case "add":
 
-		ingress, err := w.ingressLister.Ingresses(w.namespace).Get(ingressname)
-		tunnel := w.tunnels[servicename]
+		ingress, err := w.ingressLister.Ingresses(namespace).Get(ingressname)
+		tunnel := w.tunnels[key]
 		if tunnel != nil {
-			glog.V(5).Infof("Tunnel \"%s\" (%s) already exists", servicename, tunnel.Config().ExternalHostname)
+			glog.V(5).Infof("Tunnel \"%s\" (%s) already exists", serviceName, tunnel.Config().ExternalHostname)
 			// return tunnel.CheckStatus()
 			return nil
 		}
 		if err != nil {
 
-			all, _ := w.ingressLister.Ingresses(w.namespace).List(labels.Everything())
-			glog.V(2).Infof("all ingresses in %s: %v", w.namespace, all)
+			all, _ := w.ingressLister.Ingresses(namespace).List(labels.Everything())
+			glog.V(2).Infof("all ingresses in %s: %v", "*", all)
 
 			return fmt.Errorf("failed to retrieve ingress by name %q: %v", ingressname, err)
 		}
@@ -382,19 +408,19 @@ func (w *WarpController) processIngress(queueKey string) error {
 
 	case "delete":
 
-		return w.removeTunnel(servicename)
+		return w.removeTunnel(namespace, serviceName)
 
 	case "update":
 		// Not clear how much work we should put into watching the running state of the tunnel so
 		// lets just do CheckStatus here every time we see an ingress update
 		//
 		// if the ingress has been edited to change the hostname, we should update
-		tunnel := w.tunnels[servicename]
+		tunnel := w.tunnels[key]
 
 		if tunnel == nil {
-			glog.V(5).Infof("Ingress %s is missing a tunnel, creating now", servicename)
+			glog.V(5).Infof("Ingress %s is missing a tunnel, creating now", serviceName)
 
-			ingress, err := w.ingressLister.Ingresses(w.namespace).Get(ingressname)
+			ingress, err := w.ingressLister.Ingresses(namespace).Get(ingressname)
 			if err != nil {
 				return fmt.Errorf("failed to retrieve ingress by key %q: %v", ingressname, err)
 			}
@@ -430,52 +456,37 @@ func (w *WarpController) processNextService() bool {
 
 func (w *WarpController) processService(queueKey string) error {
 
-	// var key, op, name string
-	var name string
+	op, namespace, serviceName := parseServiceKey(queueKey)
 
-	identifiers := strings.SplitN(queueKey, ":", 2)
-	op := identifiers[0]
-	key := identifiers[1]
-
-	identifiers = strings.SplitN(key, "/", 2)
-	if len(identifiers) == 1 {
-		// namespace = ""
-		name = identifiers[0]
-	} else if len(identifiers) == 2 {
-		// namespace = identifiers[0]
-		name = identifiers[1]
-	}
-
-	t := w.getTunnelForService(name)
-	if t == nil {
+	t, found := w.getTunnelForService(namespace, serviceName)
+	if !found {
 		return nil
 	}
 
 	switch op {
 
 	case "add":
-		return w.startOrStop(key)
+		return w.startOrStop(namespace, serviceName)
 
 	case "delete":
 		return t.Stop()
 
 	case "update":
-		return w.startOrStop(key)
+		return w.startOrStop(namespace, serviceName)
 
 	default:
-		return fmt.Errorf("Unhandled operation \"%s\", %s", op, name)
+		return fmt.Errorf("Unhandled operation \"%s\", %s", op, serviceName)
 
 	}
 }
 
-func (w *WarpController) getTunnelForService(servicename string) tunnel.Tunnel {
+func (w *WarpController) getTunnelForService(namespace, serviceName string) (tunnel.Tunnel, bool) {
 	for _, t := range w.tunnels {
-		if servicename == t.Config().ServiceName {
-			return t
+		if serviceName == t.Config().ServiceName && namespace == t.Config().ServiceNamespace {
+			return t, true
 		}
 	}
-	return nil
-
+	return nil, false
 }
 
 func handleErr(err error, key interface{}, queue workqueue.RateLimitingInterface) {
@@ -588,7 +599,7 @@ func (w *WarpController) readOriginCert(hostname string) ([]byte, error) {
 	return originCert, nil
 }
 
-// creates a tunnel and stores a reference to it by servicename
+// creates a tunnel and stores a reference to it by serviceName
 func (w *WarpController) createTunnel(ingress *v1beta1.Ingress) error {
 	err := w.validateIngress(ingress)
 	if err != nil {
@@ -607,6 +618,7 @@ func (w *WarpController) createTunnel(ingress *v1beta1.Ingress) error {
 
 	config := &tunnel.Config{
 		ServiceName:      serviceName,
+		ServiceNamespace: ingress.ObjectMeta.Namespace,
 		ServicePort:      servicePort,
 		ExternalHostname: hostName,
 		LBPool:           lbPool,
@@ -618,33 +630,35 @@ func (w *WarpController) createTunnel(ingress *v1beta1.Ingress) error {
 	if err != nil {
 		return err
 	}
-	w.tunnels[serviceName] = tunnel
+	key := fmt.Sprintf("%s/%s", ingress.ObjectMeta.Namespace, serviceName)
+	w.tunnels[key] = tunnel
 	glog.V(5).Infof("added tunnel for ingress %s, service %s", ingress.GetName(), serviceName)
 
-	return w.startOrStop(serviceName)
+	return w.startOrStop(ingress.ObjectMeta.Namespace, serviceName)
 }
 
 // starts or stops the tunnel depending on the existence of
 // the associated service and endpoints
-func (w *WarpController) startOrStop(servicename string) error {
-	glog.V(5).Infof("Start or Stop %s", servicename)
+func (w *WarpController) startOrStop(namespace, serviceName string) error {
+	glog.V(5).Infof("Start or Stop %s", serviceName)
 
-	t := w.tunnels[servicename]
+	key := fmt.Sprintf("%s/%s", namespace, serviceName)
+	t := w.tunnels[key]
 	if t == nil {
-		return fmt.Errorf("Tunnel not found for key %s", servicename)
+		return fmt.Errorf("Tunnel not found for key %s", key)
 	}
 
-	service, err := w.serviceLister.Services(w.namespace).Get(servicename)
+	service, err := w.serviceLister.Services(namespace).Get(serviceName)
 	if service == nil || err != nil {
-		glog.V(2).Infof("Service %s not found for tunnel", servicename)
+		glog.V(2).Infof("Service %s not found for tunnel", key)
 		if t.Active() {
 			return t.Stop()
 		}
 		return nil
 	}
-	endpoints, err := w.endpointsLister.Endpoints(w.namespace).Get(servicename)
+	endpoints, err := w.endpointsLister.Endpoints(namespace).Get(serviceName)
 	if err != nil || endpoints == nil || len(endpoints.Subsets) == 0 {
-		glog.V(2).Infof("Endpoints %s not found for tunnel", servicename)
+		glog.V(2).Infof("Endpoints %s not found for tunnel", key)
 
 		if t.Active() {
 			return t.Stop()
@@ -652,7 +666,7 @@ func (w *WarpController) startOrStop(servicename string) error {
 		return nil
 	}
 
-	glog.V(5).Infof("Validation ok for starting %s/%d", servicename, len(endpoints.Subsets))
+	glog.V(5).Infof("Validation ok for starting %s/%d", key, len(endpoints.Subsets))
 	if !t.Active() {
 		var port int32
 		ingressServicePort := t.Config().ServicePort
@@ -665,23 +679,24 @@ func (w *WarpController) startOrStop(servicename string) error {
 			}
 		}
 		if port == 0 {
-			return fmt.Errorf("Unable to match port %s to service %s", ingressServicePort.String(), servicename)
+			return fmt.Errorf("Unable to match port %s to service %s", ingressServicePort.String(), key)
 		}
-		url := fmt.Sprintf("%s:%d", service.ObjectMeta.Name, port)
+		url := fmt.Sprintf("%s.%s:%d", service.ObjectMeta.Name, service.ObjectMeta.Namespace, port)
 		glog.V(5).Infof("Starting tunnel to url %s", url)
 		return t.Start(url)
 	}
 	return nil
 }
 
-func (w *WarpController) removeTunnel(servicename string) error {
+func (w *WarpController) removeTunnel(namespace, serviceName string) error {
+	key := fmt.Sprintf("%s/%s", namespace, serviceName)
 
-	t := w.tunnels[servicename]
+	t := w.tunnels[key]
 	if t == nil {
-		return fmt.Errorf("Tunnel not found for key %s", servicename)
+		return fmt.Errorf("Tunnel not found for key %s", key)
 	}
 	err := t.Stop()
-	delete(w.tunnels, servicename)
+	delete(w.tunnels, key)
 	return err
 }
 

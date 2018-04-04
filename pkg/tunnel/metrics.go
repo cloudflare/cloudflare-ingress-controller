@@ -1,8 +1,11 @@
 package tunnel
 
 import (
+	"fmt"
+	"net"
 	"time"
 
+	"github.com/cloudflare/cloudflared/metrics"
 	"github.com/cloudflare/cloudflared/origin"
 )
 
@@ -31,4 +34,13 @@ func NewDummyMetrics() *MetricsConfig {
 		Metrics:         &origin.TunnelMetrics{},
 		UpdateFrequency: 10000 * time.Hour,
 	}
+}
+
+func ServeMetrics(port int, shutdownC <-chan struct{}) (err error) {
+
+	metricsListener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return err
+	}
+	return metrics.ServeMetrics(metricsListener, shutdownC)
 }

@@ -4,8 +4,8 @@ replicaCount: 2
 
 image:
   repository: quay.io/stackpoint/warp-controller
-  tag: 0.4.1
-  pullPolicy: Always
+  tag: 0.4.2
+  pullPolicy: IfNotPresent
 
 resources:
   limits:

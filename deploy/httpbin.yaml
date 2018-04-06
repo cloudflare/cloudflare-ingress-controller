@@ -7,7 +7,7 @@ items:
 - kind: Deployment
   apiVersion: apps/v1beta1
   metadata:
-    name: httpbin
+    name: hb
   spec:
     replicas: 2
     template:
@@ -16,14 +16,14 @@ items:
           app: warp-service-app
       spec:
         containers:
-        - name: httpbin
+        - name: hb
           image: kennethreitz/httpbin:latest
           ports:
           - containerPort: 8080
 - kind: Service
   apiVersion: v1
   metadata:
-    name: httpbin-service
+    name: hb
   spec:
     selector:
       app: warp-service-app
@@ -34,15 +34,15 @@ items:
 - apiVersion: extensions/v1beta1
   kind: Ingress
   metadata:
-    name: httpbin
+    name: hb
     annotations:
       kubernetes.io/ingress.class: cloudflare-warp
   spec:
     rules:
-    - host: httpbin.example.co
+    - host: hb.anthopleura.net
       http:
         paths:
         - path: /
           backend:
-            serviceName: httpbin-service
+            serviceName: hb
             servicePort: 80

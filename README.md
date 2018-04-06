@@ -1,210 +1,258 @@
-# cloudflare-warp-ingress
+# Cloudflare Argo Tunnel Ingress Controller
 
-Implements a Kubernetes ingress controller using cloudflare-warp tunnel
-to connect a cloudflare-managed URL to a Kubernetes service.
+### About
 
+Cloudflare Argo Tunnel is an easy way to expose web servers securely to the
+public internet, and routes traffic between the endpoints through an encrypted
+tunnel and Cloudflare infrastructure. It is integrated with Cloudflare Argo
+routing to provide efficient routing through Cloudflare's datacenters. The
+`cloudflared` application is used to establish the tunnel wehn the web server is
+running on a host directly.
 
-## Getting started
+The Argo Tunnel Ingress Controller uses kubernetes tools to provide routing for
+services running in a cluster. The ingress controller is a native kubernetes
+component and works the same way on any cluster: on a cloud provider, on bare
+metal, or minikube.
 
-The Warp controller will manage ingress tunnels in a single
-namespace of the cluster.  Multiple controllers can exist
-in different namespaces, with different credentials for
-each namespace.
+Cloudflare Argo Links:
 
+- [Argo Tunnel](https://developers.cloudflare.com/argo-tunnel/)
+- [Argo Routing](https://www.cloudflare.com/products/argo-smart-routing/)
+- [Ingress Controller](https://github.com/cloudflare/cloudflare-ingress-controller)
 
-#### Pre-requirements
+Argo Tunnel was previously known as Cloudflare Warp, and not all components have
+been renamed.
 
-To use this, you need:
-- a [Cloudflare](https://www.cloudflare.com/) account (free tier is OK)
-- a zone (domain name) in your Cloudflare account
-- a [Kubernetes](https://kubernetes.io/) cluster
+### Installation and Configuration
 
-The deployment instructions below use a few YAML files that
-will be used with `kubectl` to create the appropriate resources
-in Kubernetes. You might want to checkout that repository
-to have them handy!
+In order to use the ingress controller you must have
 
+- a cloudflare account with argo enabled, associated with a domain
+- a kubernetes cluster
+- a service in the cluster you want to expose
 
-#### Get Warp credentials
+#### Configuring the Cloudflare account
 
-The first step is to obtain the credentials that will
-be used by the controller to authenticate with Cloudflare.
+Instructions to configure the account are found at
+https://developers.cloudflare.com/argo-tunnel/quickstart/quickstart/
 
-First, install the Warp client.
+The `cloudflared` executable is required to obtain the argo token and
+certificate. The token and certificate must be saved as a secret in the
+kubernetes cluster.
 
-```
-# On Linux
-curl https://bin.equinox.io/c/2ovkwS9YHaP/warp-stable-linux-amd64.tgz \
-     | tar -zxC /usr/local/bin
+To retrieve the certificate
 
-# On macOS
-curl https://warp.cloudflare.com/dl/warp-stable-darwin-amd64.tgz \
-    | tar -zxC /usr/local/bin
-```
+- obtain the [cloudflared executable](https://developers.cloudflare.com/argo-tunnel/downloads/)
+- run `cloudflared login`
+- select the domain
+- save the file locally (by default, to $HOME/.cloudflared/cert.pem)
 
-(See [here](https://warp.cloudflare.com/downloads/) for further
-installation information and links.)
+#### Running a Kubernetes cluster
 
-Then, use the client to log in.
+The easiest way to get started with Kubernetes and Argo Tunnel is with
+[StackPointCloud](https://stackpoint.io), where you can run a kubernetes cluster
+on any of several cloud providers, and install the Argo Tunnel immediately or as
+an added solution.
 
-```
-cloudflare-warp login
-```
+Using the StackPointCloud interface, save the tunnel certificate for your
+organization as Solution Credentials.  Then, when creating the cluster (or
+adding as solution later), select the _Cloudflare_ solution, and the ingress
+controller components will be added automatically.
 
-This will open a browser page (or show you an URL to open in your
-browser) to complete the login process. After this, the credentials
-will be available in file `.cloudflare-warp/cert.pem`.
+#### Installing the controller components with helm
 
+If you are using a different kubernetes cluster, [Helm](http://helm.sh) is the
+simplest way to get started.  [Helm](http://helm.sh) is a package manager for
+kubernetes which defines an application as a set of templates and make it easy
+to install and update the application in a kubernetes cluster.
 
-#### Push credentials to Kubernetes
+The Helm chart that describes all the components is found in controller [github
+repository](https://github.com/cloudflare/cloudflare-ingress-controller) and is
+also hosted at the StackPointCloud [trusted charts
+repository](http://trusted-charts.stackpoint.io/)
 
-The cloudflare _cert.pem_ file is saved as a Kubernetes secret and
-will be mounted as a file into the pod that creates the tunnel.
+To install the ingress controller with an downloaded certificate, you must
+define a few variables, one of which is the base64-encoded contents of the
+certificate
 
-```
-kubectl create secret generic cloudflare-warp-cert \
-   --from-file=${HOME}/.cloudflare-warp/cert.pem
-```
-
-
-#### Deploy the Warp controller
-
-This will create a service account for the Warp controller, and
-create a Kubernetes "deployment" resource for the controller
-(just like `kubectl run` would).
-
-```
-kubectl create -f deploy/cloudflare-warp-serviceaccount.yaml
-kubectl create -f deploy/warp-controller-deployment.yaml
-```
-
-
-#### RBAC configuration
-
-If your cluster has RBAC enabled, then the Warp controller must be configured
-with sufficient rights to observe ingresses, services and endpoints.
-
-```
-kubectl create -f deploy/cloudflare-warp-role.yaml
-kubectl create -f deploy/cloudflare-warp-rolebinding.yaml
-```
-
-
-#### Create ingress
-
-An example of deployment, service and ingress resources can be found in `deploy/nginx.yaml` and in `deploy/httpbin.yaml`
-
-Edit these files to change:
-- the `host` to be used (this can be any name under the zone that you
-  picked during the `cloudflare-warp login` process earlier)
-- the `serviceName` that you want to expose (and the port number if
-  it is different)
-
-Then create the resources.
-
-```
-kubectl create -f deploy/nginx.yaml
-kubectl create -f deploy/httpbin.yaml
-```
-
-Inspect the ingress
-```
-kubectl get ingress
-```
-
-You should now be able to access that service using the specified URL.
-
-#### Troubleshooting
-
-If things don't work as expected, check the logs of the controller.
-
-```
-kubectl logs deploy/warp-controller
-```
-
-### Installation with helm
-
-The [helm]](https://docs.helm.sh/) tool can be use to quickly install the warp
-ingress controller into your kubernetes cluster. The helm chart in this
-repository can be used directly, overriding only a couple of default values. As
-before, you must have a valid cloudflare warp certificate for your domain. The
-RBAC flag must be set correctly to match your cluster.
-
-```
+```bash
 DOMAIN=mydomain.com
 CERT_B64=$(base64 $HOME/.cloudflare-warp/cert.pem)
-NAME="warp-$DOMAIN"
-NS="default"
-USE_RBAC=false
+NS="warp"
+USE_RBAC=true
 
-helm install --name $NAME --namespace $NS \
+RELEASE_NAME="warp-$DOMAIN"
+
+helm install --name $RELEASE_NAME --namespace $NS \
    --set rbac.install=$USE_RBAC \
    --set secret.install=true,secret.domain=$DOMAIN,secret.certificate_b64=$CERT_B64 \
-   chart/
+   tc/cloudflare-warp-ingress
 ```
 
-## Notes
+Helm can install the ingress controller _without_ a certificate, in which case
+you must follow the Helm chart instructions to inject the secret into the
+cluster. The ingress controller will not be able to create connections without
+the correct certificate.
 
+### Creating an ingress
 
-#### Ingress configuration
-
-The ingress must have the annotation
-_kubernetes.io<span>/</span>ingress.class: cloudflare-warp_ in order to be managed
-by the Warp controller.
-
-
-#### Namespaces
-
-Most ingress controllers are deployed to be globally available to the
-Kubernetes cluster (e.g. in the `kube-system` namespace). The Warp
-controller is a bit different. Since it holds the credentials for a
-specific DNS zone, you may want to deploy different instances with
-different credentials in different namespaces. The example above
-will create the ingress in your default namespace.
-
-If you want to deploy the controller to a different namespace, you
-need to do both of the following:
-- point `kubectl` to the right namespace (using `--namespace`, or
-  `set-context`, or whatever you prefer)
-- edit `deploy/warp-controller-deployment.yaml` to specify the
-  namespace you want to use on the controller command line using the `-namespace` flag
-
-For example, to manage ingress resources in the `blue` namespace, the `command:` block in your `warp-controller-deployment.yaml` should look like the one below:
+As a simple example of a service, let's use the https://httpbin.org service. It
+is a python flask application, and there's a container available for it. To
+install it into kubernetes, we use this manifest to install a deployment and a
+service:
 
 ```yaml
-- command:
-  - /warp-controller
-  - -v=6
-  - -namespace=blue
+apiVersion: v1
+kind: List
+metadata:
+  resourceVersion: ""
+  selfLink: ""
+items:
+- kind: Deployment
+  apiVersion: apps/v1beta1
+  metadata:
+    name: httpbin
+  spec:
+    replicas: 1
+    template:
+      metadata:
+        labels:
+          app: warp-service-app
+      spec:
+        containers:
+        - name: httpbin
+          image: kennethreitz/httpbin:latest
+          ports:
+          - containerPort: 8080
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: httpbin
+  spec:
+    selector:
+      app: warp-service-app
+    ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
 ```
-and could be deployed using
+
+The [kubernetes
+ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/) is a
+spec for external connectivity to a kubernetes service. Typically, the ingress
+will contain an annotation, _kubernetes.io/ingress.class_, to hint at the type
+of controller that should implement the connection.
+
+Our ingress manifest contains
+
+- the cloudflare-warp annotation
+- a host url which belongs to the cloudflare domain we own
+- the name of the service -- in the same namespace -- that should be exposed.
+
+```yaml
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+name: httpbin
+annotations:
+    kubernetes.io/ingress.class: cloudflare-warp
+spec:
+rules:
+- host: httpbin.anthopleura.net
+    http:
+    paths:
+    - path: /
+        backend:
+        serviceName: httpbin
+        servicePort: 80
 ```
-kubectl create --namespace blue -f deploy/warp-controller-deployment.yaml
+
+When the controller observes the creation of an ingress, it verifies that
+
+- the service exists
+- the endpoints supporting the service (pods of the deployment exist)
+- the cloudflare-warp-cert secret exists
+
+and opens a tunnel between the cloudflare receiver and the kubernetes virtual
+service ip.
+
+### Monitoring
+
+- Using the cloudflare UI
+
+https://www.cloudflare.com/a/analytics/anthopleura.net
+
+Navigate to the traffic tab, where the load-balancers, pools and origins are
+listed. From here it is possible to manually create a health check monitor.
+Generally, the health check should verify a status code of "2xx" and, using the
+advanced options, insert a Host header of the desired domain.
+
+- Examining Logs
+
+The ingress controller pods can be listed by label with
+
+```bash
+kubectl get pod -l app=cloudflare-warp-ingress
+kubectl logs -f [POD_NAME]
 ```
+The ingress controller stdout log is verbose.
 
-## Design
+### High availability
 
-There is a one-to-one relationship between a cloudflare url, a Warp
-tunnel, and a kubernetes service.  The controller watches the creation,
-update and deletion of ingresses, services and endpoints.  When an
-ingress with matching annotation is created, a tunnel-management
-object is created to match it. The life-cycle of this tunnel-management
-object matches the life-cycle of the ingress.
+- Spanning clusters
 
-When a service and at least one endpoint exist to match that ingress, the Warp
-tunnel is created to route traffic though to the kubernetes service, using
-kubernetes service-load-balancing to distribute traffic to the endpoints.
+Creating ingresses in other clusters with matching hostnames will simply add
+more origin tunnels to the cloudflare loadbalancer. From the cloudflare
+perspective, each tunnel contributes equally to the pool and so traffic will be
+routed across all the instances.
 
-The controller manages ingresses and services only in its own namespace. This
-restriction matches the normal kubernetes security boundary, along with the
-assumption that a cloudflare account is associated with a namespace.
+- Minikube
 
-There is one implementiations of the Tunnel interface, the WarpManager, which
-runs the tunnel connection in-process as a goroutine.  The tunnel connection
-lifecycle is matches the lifecycle of the service and endpoints, starting and
-stopping when the backend service and endpoints are available or unavailable.
+The ingress controller runs within minikube just as it does in a cloud-provider
+cluster, and so allows easy routing of internet traffic into a development
+environment.
 
-## Developing
+
+### Technical details and roadmap
+
+#### Kubernetes components
+
+The full controller installation comprises the following kubernetes objects:
+
+- _Deployment_:
+    Manages one or more instances of the controller, each establishing independent tunnels.
+- _Secret_:
+    Contains the cloudflare and tls credentials to establish and manage the tunnels.
+- _ClusterRole_:
+    Defines the RBAC rights for the controller, to read secrets in its own namespace and watch pods, services and ingresses in other namespaces.
+- _ServiceAccount_:
+    Defines an identity for the controller.
+- _ClusterRoleBinding_:
+    Maps the serviceaccount identity to the role.
+
+#### Roadmap
+
+- Istio
+
+Istio offers a useful set of tools for routing, managing and monitoring traffic
+within the kubernetes cluster. By ci connecting argo tunnel traffic into the
+istio mesh, we want to combine the internal traffic management tools with the
+security of the argo tunnel. This engagement is ongoing.
+
+- Prometheus metrics
+
+Currently the _cloudflared_ application, when running standalone, will expose a
+set of connection metrics for a single tunnel, making them available for
+scraping by Prometheus. We intend to expand these single-tunnel metrics to the
+multiple tunnels managed by an ingress controller.
+
+- Deeper integration with Cloudflare
+
+The cloudflare api exposes details of load-balancers, pools and origins, so
+additional annotations on the ingress could signal additional actions to the
+controller.
+
+### Contributing
 
 The following commands are a starting point for building the warp-controller code:
 
@@ -220,10 +268,15 @@ dep ensure
 make container
 ```
 
-This process should retrieve all the necessary dependencies, build the binary, and
-package it as a docker image.  Given that some of the github repositories are private,
-there may or may not be issues retrieving the code. In order to run the application in
-a kubernetes cluster, the image must be pushed to a repository.  It is currently
-being pushed to a quay<span>.</span>io repository, and this can be changed editing the references in
-the Makefile and in the _deploy_ manifest.
+This process should retrieve all the necessary dependencies, build the binary,
+and package it as a docker image.  Given that some of the github repositories
+are private, there may or may not be issues retrieving the code. In order to run
+the application in a kubernetes cluster, the image must be pushed to a
+repository.  It is currently being pushed to a quay<span>.</span>io repository,
+and this can be changed editing the references in the Makefile and in the
+_deploy_ manifest.
 
+### Engage with us
+
+- Engage with us section
+- Community forum link for CF

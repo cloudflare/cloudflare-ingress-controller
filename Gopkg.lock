@@ -42,7 +42,7 @@
     "validation",
     "websocket"
   ]
-  revision = "4153b708a40bcab48b8eabd3536d48450df5fc77"
+  revision = "ff6a14283df0734e7090003c39e932ee2d310a64"
 
 [[projects]]
   name = "github.com/davecgh/go-spew"

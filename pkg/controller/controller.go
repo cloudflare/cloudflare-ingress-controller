@@ -5,27 +5,21 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/labels"
-
+	"github.com/cloudflare/cloudflare-warp-ingress/pkg/tunnel"
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	//v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/v1"
-	// v1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
-
-	"k8s.io/apimachinery/pkg/util/intstr"
-
 	lister_v1 "k8s.io/client-go/listers/core/v1"
 	lister_v1beta1 "k8s.io/client-go/listers/extensions/v1beta1"
-
-	"github.com/cloudflare/cloudflare-warp-ingress/pkg/tunnel"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 )
 
 const (

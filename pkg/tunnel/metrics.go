@@ -6,7 +6,7 @@ import (
 	"github.com/cloudflare/cloudflared/origin"
 )
 
-// MetricsConfig wraps the cloudflare-warp tunnel metrics in a struct
+// MetricsConfig wraps the argo tunnel metrics in a struct
 type MetricsConfig struct {
 	Metrics         *origin.TunnelMetrics
 	UpdateFrequency time.Duration

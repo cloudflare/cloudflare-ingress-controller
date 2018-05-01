@@ -265,6 +265,16 @@ git clone https://github.com/cloudflare/cloudflare-warp-ingress/
 
 cd cloudflare-warp-ingress/
 dep ensure
+```
+
+build locally:
+```
+go build ./...
+go test ./...
+```
+
+build in docker, and make docker image
+```
 make container
 ```
 

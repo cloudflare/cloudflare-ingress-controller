@@ -13,7 +13,7 @@ items:
     template:
       metadata:
         labels:
-          app: warp-service-app
+          app: argo-service-app
       spec:
         containers:
         - name: hb
@@ -26,7 +26,7 @@ items:
     name: hb
   spec:
     selector:
-      app: warp-service-app
+      app: argo-service-app
     ports:
     - protocol: TCP
       port: 80
@@ -36,7 +36,7 @@ items:
   metadata:
     name: hb
     annotations:
-      kubernetes.io/ingress.class: cloudflare-warp
+      kubernetes.io/ingress.class: argo-tunnel
   spec:
     rules:
     - host: hb.anthopleura.net

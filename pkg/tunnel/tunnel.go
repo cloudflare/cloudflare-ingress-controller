@@ -5,7 +5,7 @@ import (
 )
 
 // Tunnel is the interface for different implementation of
-// the cloudflare-warp tunnel, matching an external hostname
+// the argo tunnel, matching an external hostname
 // to a kubernetes service
 type Tunnel interface {
 

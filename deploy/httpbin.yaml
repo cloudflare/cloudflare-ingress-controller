@@ -39,7 +39,7 @@ items:
       kubernetes.io/ingress.class: argo-tunnel
   spec:
     rules:
-    - host: hb.anthopleura.net
+    - host: hb.example.com
       http:
         paths:
         - path: /

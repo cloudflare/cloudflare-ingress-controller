@@ -29,7 +29,7 @@ type Tunnel interface {
 }
 
 // Config contains the smallest set of elements to define
-// a warp tunnel
+// an argo tunnel
 type Config struct {
 	ServiceName      string
 	ServiceNamespace string

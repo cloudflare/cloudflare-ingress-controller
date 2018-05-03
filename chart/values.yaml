@@ -22,7 +22,7 @@ rbac:
 
 # The secret contains the base64-encoded origin certificate for your cloudflare domain.
 # Set the install flag false to configure manually in the cluster later.
-# See https://warp.cloudflare.com/quickstart/quickstart/ for information on
+# See https://developers.cloudflare.com/argo-tunnel/quickstart/quickstart/ for information on
 # obtaining the origin certificate
 secret:
   install: false

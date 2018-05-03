@@ -1,4 +1,4 @@
 package version
 
-var APP_NAME = "warp-controller"
+var APP_NAME = "argot"
 var VERSION = "UNKNOWN"

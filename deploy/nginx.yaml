@@ -57,11 +57,11 @@ items:
   kind: Ingress
   metadata:
     annotations:
-      kubernetes.io/ingress.class: cloudflare-argo
+      kubernetes.io/ingress.class: argo-tunnel
     name: nginx
   spec:
     rules:
-    - host: nginx.example.co
+    - host: nginx.anthopleura.net
       http:
         paths:
         - backend:

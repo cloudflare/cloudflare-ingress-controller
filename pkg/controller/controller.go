@@ -89,6 +89,12 @@ func (argo *ArgoController) getTunnel(key string) tunnel.Tunnel {
 	return argo.tunnels[key]
 }
 
+func (argo *ArgoController) setTunnel(key string, t tunnel.Tunnel) {
+	argo.mux.Lock()
+	defer argo.mux.Unlock()
+	argo.tunnels[key] = t
+}
+
 func (argo *ArgoController) getTunnelsForService(namespace, serviceName string) []string {
 	argo.mux.Lock()
 	defer argo.mux.Unlock()
@@ -626,9 +632,7 @@ func (argo *ArgoController) createTunnel(key string, ingress *v1beta1.Ingress) e
 	if err != nil {
 		return err
 	}
-	argo.mux.Lock()
-	argo.mux.Unlock()
-	argo.tunnels[key] = tunnel
+	argo.setTunnel(key, tunnel)
 	glog.V(5).Infof("created tunnel for ingress %s,  %s", ingressName, key)
 
 	return argo.evaluateTunnelStatus(key)
@@ -764,25 +768,25 @@ func (argo *ArgoController) stopTunnel(t tunnel.Tunnel) error {
 
 func (argo *ArgoController) removeTunnel(key string) error {
 	glog.V(2).Infof("Removing tunnel %s", key)
-	argo.mux.Lock()
-	defer argo.mux.Unlock()
-	t := argo.tunnels[key]
+	t := argo.getTunnel(key)
 	if t == nil {
 		return fmt.Errorf("Tunnel not found for key %s", key)
 	}
 	err := argo.stopTunnel(t)
+	argo.mux.Lock()
 	delete(argo.tunnels, key)
+	argo.mux.Unlock()
 	return err
 }
 
 func (argo *ArgoController) tearDown() error {
 	glog.V(2).Infof("Tearing down tunnels")
 
-	argo.mux.Lock()
-	defer argo.mux.Unlock()
 	for _, t := range argo.tunnels {
 		t.TearDown()
 	}
+	argo.mux.Lock()
 	argo.tunnels = make(map[string]tunnel.Tunnel)
+	argo.mux.Unlock()
 	return nil
 }

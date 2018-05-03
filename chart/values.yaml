@@ -4,7 +4,7 @@ replicaCount: 1
 
 image:
   repository: gcr.io/stackpoint-public/argot
-  tag: 0.1.6
+  tag: 0.5.0
   pullPolicy: IfNotPresent
 
 resources:

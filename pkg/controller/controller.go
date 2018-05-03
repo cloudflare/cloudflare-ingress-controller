@@ -3,10 +3,12 @@ package controller
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cloudflare/cloudflare-ingress-controller/pkg/tunnel"
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,6 +30,7 @@ const (
 	cloudflareArgoIngressType = "argo-tunnel"
 	ingressAnnotationLBPool   = "argo.cloudflare.com/lb-pool"
 	secretLabelDomain         = "cloudflare-argo/domain"
+	secretName                = "cloudflared-cert"
 )
 
 // ArgoController object
@@ -47,8 +50,13 @@ type ArgoController struct {
 	endpointsLister   lister_v1.EndpointsLister
 	endpointsInformer cache.Controller
 
+	// namespace of the controller
 	namespace string
-	tunnels   map[string]tunnel.Tunnel
+
+	// map of key to tunnels
+	// where key concatenates the namespace, ingressname and servicename
+	mux     sync.Mutex
+	tunnels map[string]tunnel.Tunnel
 }
 
 func NewArgoController(client kubernetes.Interface, namespace string) *ArgoController {
@@ -66,12 +74,37 @@ func NewArgoController(client kubernetes.Interface, namespace string) *ArgoContr
 		ingressLister:    lister_v1beta1.NewIngressLister(indexer),
 
 		namespace: namespace,
+		mux:       sync.Mutex{},
 		tunnels:   tunnels,
 	}
 	argo.configureServiceInformer()
 	argo.configureEndpointInformer()
 
 	return argo
+}
+
+func (argo *ArgoController) getTunnel(key string) tunnel.Tunnel {
+	argo.mux.Lock()
+	defer argo.mux.Unlock()
+	return argo.tunnels[key]
+}
+
+func (argo *ArgoController) setTunnel(key string, t tunnel.Tunnel) {
+	argo.mux.Lock()
+	defer argo.mux.Unlock()
+	argo.tunnels[key] = t
+}
+
+func (argo *ArgoController) getTunnelsForService(namespace, serviceName string) []string {
+	argo.mux.Lock()
+	defer argo.mux.Unlock()
+	var keys []string
+	for key, t := range argo.tunnels {
+		if serviceName == t.Config().ServiceName && namespace == t.Config().ServiceNamespace {
+			keys = append(keys, key)
+		}
+	}
+	return keys
 }
 
 // EnableMetrics configures a new metrics config for the controller
@@ -106,10 +139,21 @@ func createIngressInformer(client kubernetes.Interface) (cache.Controller, cache
 				}
 			},
 			UpdateFunc: func(old, new interface{}) {
-				if key, ok := shouldHandleIngress(old); ok {
-					queue.Add("update:" + key)
-				} else {
-					return
+				oldKey, oldOK := shouldHandleIngress(old)
+				newKey, newOK := shouldHandleIngress(new)
+				if oldOK || newOK {
+					if oldOK && !newOK {
+						queue.Add("delete:" + oldKey)
+					} else if !oldOK && newOK {
+						queue.Add("add:" + newKey)
+					} else {
+						if oldKey != newKey {
+							queue.Add("delete:" + oldKey)
+							queue.Add("add:" + newKey)
+						} else {
+							queue.Add("update:" + newKey)
+						}
+					}
 				}
 			},
 			DeleteFunc: func(obj interface{}) {
@@ -140,25 +184,6 @@ func shouldHandleIngress(obj interface{}) (string, bool) {
 	}
 	glog.V(5).Infof("Annotation %s=%s", ingressClassKey, val)
 	if val != cloudflareArgoIngressType {
-		return "", false
-	}
-
-	rules := ingress.Spec.Rules
-	if len(rules) == 0 {
-		glog.V(2).Infof("Cannot create tunnel for ingress with no rules")
-		return "", false
-	}
-	if len(rules) > 1 {
-		glog.V(2).Infof("Cannot create tunnel for ingress with multiple rules")
-		return "", false
-	}
-	paths := rules[0].HTTP.Paths
-	if len(paths) == 0 {
-		glog.V(2).Infof("Cannot create tunnel for ingress with no paths")
-		return "", false
-	}
-	if len(paths) > 1 {
-		glog.V(2).Infof("Cannot create tunnel for ingress with multiple paths")
 		return "", false
 	}
 	return constructIngressKey(ingress), true
@@ -325,9 +350,6 @@ func (argo *ArgoController) processNextIngress() bool {
 	if quit {
 		return false
 	}
-	// Tell the queue that we are done with processing this key. This unblocks the key for other workers
-	// This allows safe parallel processing because two pods with the same key are never processed in
-	// parallel.
 	defer argo.ingressWorkqueue.Done(key)
 
 	err := argo.processIngress(key.(string))
@@ -357,7 +379,10 @@ func parseServiceKey(queueKey string) (string, string, string) {
 }
 
 func constructIngressKey(ingress *v1beta1.Ingress) string {
-	return fmt.Sprintf("%s/%s/%s", ingress.ObjectMeta.Namespace, ingress.ObjectMeta.Name, ingress.Spec.Rules[0].HTTP.Paths[0].Backend.ServiceName)
+	return constructIngressKeyFromStrings(ingress.ObjectMeta.Namespace, ingress.ObjectMeta.Name, ingress.Spec.Rules[0].HTTP.Paths[0].Backend.ServiceName)
+}
+func constructIngressKeyFromStrings(namespace, ingressname, servicename string) string {
+	return fmt.Sprintf("%s/%s/%s", namespace, ingressname, servicename)
 }
 
 func parseIngressKey(queueKey string) (string, string, string, string) {
@@ -376,53 +401,43 @@ func parseIngressKey(queueKey string) (string, string, string, string) {
 
 func (argo *ArgoController) processIngress(queueKey string) error {
 
-	op, namespace, ingressname, serviceName := parseIngressKey(queueKey)
-	key := namespace + "/" + serviceName
+	op, namespace, ingressname, servicename := parseIngressKey(queueKey)
 
 	switch op {
 
 	case "add":
 
 		ingress, err := argo.ingressLister.Ingresses(namespace).Get(ingressname)
-		tunnel := argo.tunnels[key]
-		if tunnel != nil {
-			glog.V(5).Infof("Tunnel \"%s\" (%s) already exists", serviceName, tunnel.Config().ExternalHostname)
-			// return tunnel.CheckStatus()
-			return nil
-		}
 		if err != nil {
-
 			all, _ := argo.ingressLister.Ingresses(namespace).List(labels.Everything())
 			glog.V(2).Infof("all ingresses in %s: %v", "*", all)
-
 			return fmt.Errorf("failed to retrieve ingress by name %q: %v", ingressname, err)
 		}
+		key := constructIngressKey(ingress)
 
-		return argo.createTunnel(ingress)
-
-	case "delete":
-
-		return argo.removeTunnel(namespace, serviceName)
-
-	case "update":
-		// Not clear how much work we should put into watching the running state of the tunnel so
-		// lets just do CheckStatus here every time we see an ingress update
-		//
-		// if the ingress has been edited to change the hostname, we should update
-		tunnel := argo.tunnels[key]
-
-		if tunnel == nil {
-			glog.V(5).Infof("Ingress %s is missing a tunnel, creating now", serviceName)
-
-			ingress, err := argo.ingressLister.Ingresses(namespace).Get(ingressname)
-			if err != nil {
-				return fmt.Errorf("failed to retrieve ingress by key %q: %v", ingressname, err)
-			}
-			return argo.createTunnel(ingress)
+		tunnel := argo.getTunnel(key)
+		if tunnel != nil {
+			glog.V(5).Infof("Tunnel \"%s\" (%s) already exists", key, tunnel.Config().ExternalHostname)
+			return nil
 		}
 
-		// return tunnel.CheckStatus()
-		return nil
+		return argo.createTunnel(key, ingress)
+
+	case "delete":
+		key := constructIngressKeyFromStrings(namespace, ingressname, servicename)
+		return argo.removeTunnel(key)
+
+	case "update":
+
+		ingress, err := argo.ingressLister.Ingresses(namespace).Get(ingressname)
+		if err != nil {
+			all, _ := argo.ingressLister.Ingresses(namespace).List(labels.Everything())
+			glog.V(2).Infof("all ingresses in %s: %v", "*", all)
+			return fmt.Errorf("failed to retrieve ingress by name %q: %v", ingressname, err)
+		}
+		key := constructIngressKey(ingress)
+
+		return argo.updateTunnel(key, ingress)
 
 	default:
 		return fmt.Errorf("Unhandled operation \"%s\"", op)
@@ -450,37 +465,30 @@ func (argo *ArgoController) processNextService() bool {
 
 func (argo *ArgoController) processService(queueKey string) error {
 
-	op, namespace, serviceName := parseServiceKey(queueKey)
+	_, namespace, serviceName := parseServiceKey(queueKey)
 
-	t, found := argo.getTunnelForService(namespace, serviceName)
-	if !found {
+	keys := argo.getTunnelsForService(namespace, serviceName)
+	if len(keys) == 0 {
+		// no tunnels or ingresses exist for this service
 		return nil
 	}
 
-	switch op {
-
-	case "add":
-		return argo.startOrStop(namespace, serviceName)
-
-	case "delete":
-		return t.Stop()
-
-	case "update":
-		return argo.startOrStop(namespace, serviceName)
-
-	default:
-		return fmt.Errorf("Unhandled operation \"%s\", %s", op, serviceName)
-
-	}
-}
-
-func (argo *ArgoController) getTunnelForService(namespace, serviceName string) (tunnel.Tunnel, bool) {
-	for _, t := range argo.tunnels {
-		if serviceName == t.Config().ServiceName && namespace == t.Config().ServiceNamespace {
-			return t, true
+	var errorMessage string
+	for _, key := range keys {
+		err := argo.evaluateTunnelStatus(key)
+		if err != nil {
+			if errorMessage == "" {
+				errorMessage = err.Error()
+			} else {
+				errorMessage = errorMessage + "; " + err.Error()
+			}
 		}
 	}
-	return nil, false
+	if errorMessage != "" {
+		return fmt.Errorf("at least one error occured handling %s: %s", queueKey, errorMessage)
+	}
+	return nil
+
 }
 
 func handleErr(err error, key interface{}, queue workqueue.RateLimitingInterface) {
@@ -565,8 +573,6 @@ func (argo *ArgoController) readSecret(hostname string) (*v1.Secret, error) {
 		return &certSecretList.Items[0], nil
 	}
 
-	secretName := "cloudflared-cert"
-
 	certSecret, err = argo.client.CoreV1().Secrets(argo.namespace).Get(secretName, meta_v1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -579,7 +585,6 @@ func (argo *ArgoController) readSecret(hostname string) (*v1.Secret, error) {
 func (argo *ArgoController) readOriginCert(hostname string) ([]byte, error) {
 	// in the future, we will have multiple secrets
 	// at present the mapping of hostname -> secretname is "*" -> "cloudflared-cert"
-	secretName := "cloudflared-cert"
 
 	certSecret, err := argo.client.CoreV1().Secrets(argo.namespace).Get(secretName, meta_v1.GetOptions{})
 	if err != nil {
@@ -594,13 +599,16 @@ func (argo *ArgoController) readOriginCert(hostname string) ([]byte, error) {
 }
 
 // creates a tunnel and stores a reference to it by serviceName
-func (argo *ArgoController) createTunnel(ingress *v1beta1.Ingress) error {
+func (argo *ArgoController) createTunnel(key string, ingress *v1beta1.Ingress) error {
 	err := argo.validateIngress(ingress)
 	if err != nil {
 		return err
 	}
-	glog.V(5).Infof("creating tunnel for ingress %s", ingress.GetName())
+	ingressName := ingress.GetName()
 	serviceName := argo.getServiceNameForIngress(ingress)
+	// key := fmt.Sprintf("%s/%s", ingress.ObjectMeta.Namespace, serviceName)
+	glog.V(5).Infof("creating tunnel for ingress %s, %s", ingressName, key)
+
 	servicePort := argo.getServicePortForIngress(ingress)
 	hostName := argo.getHostNameForIngress(ingress)
 	lbPool := argo.getLBPoolForIngress(ingress)
@@ -614,83 +622,160 @@ func (argo *ArgoController) createTunnel(ingress *v1beta1.Ingress) error {
 		ServiceName:      serviceName,
 		ServiceNamespace: ingress.ObjectMeta.Namespace,
 		ServicePort:      servicePort,
+		IngressName:      ingress.ObjectMeta.Name,
 		ExternalHostname: hostName,
 		LBPool:           lbPool,
 		OriginCert:       originCert,
 	}
 
 	tunnel, err := tunnel.NewArgoTunnelManager(config, argo.metricsConfig)
-
 	if err != nil {
 		return err
 	}
-	key := fmt.Sprintf("%s/%s", ingress.ObjectMeta.Namespace, serviceName)
-	argo.tunnels[key] = tunnel
-	glog.V(5).Infof("added tunnel for ingress %s, service %s", ingress.GetName(), serviceName)
+	argo.setTunnel(key, tunnel)
+	glog.V(5).Infof("created tunnel for ingress %s,  %s", ingressName, key)
 
-	return argo.startOrStop(ingress.ObjectMeta.Namespace, serviceName)
+	return argo.evaluateTunnelStatus(key)
 }
 
-// starts or stops the tunnel depending on the existence of
-// the associated service and endpoints
-func (argo *ArgoController) startOrStop(namespace, serviceName string) error {
-	glog.V(5).Infof("Start or Stop %s", serviceName)
-
-	key := fmt.Sprintf("%s/%s", namespace, serviceName)
-	t := argo.tunnels[key]
+// updates a tunnel and stores a reference to it by serviceName
+func (argo *ArgoController) updateTunnel(key string, ingress *v1beta1.Ingress) error {
+	err := argo.validateIngress(ingress)
+	if err != nil {
+		argo.removeTunnel(key)
+		return err
+	}
+	t := argo.getTunnel(key)
 	if t == nil {
-		return fmt.Errorf("Tunnel not found for key %s", key)
+		return argo.createTunnel(key, ingress)
 	}
 
-	service, err := argo.serviceLister.Services(namespace).Get(serviceName)
-	if service == nil || err != nil {
-		glog.V(2).Infof("Service %s not found for tunnel", key)
-		if t.Active() {
-			return t.Stop()
-		}
-		return nil
-	}
-	endpoints, err := argo.endpointsLister.Endpoints(namespace).Get(serviceName)
-	if err != nil || endpoints == nil || len(endpoints.Subsets) == 0 {
-		glog.V(2).Infof("Endpoints %s not found for tunnel", key)
+	servicePort := argo.getServicePortForIngress(ingress)
+	serviceName := argo.getServiceNameForIngress(ingress)
+	hostName := argo.getHostNameForIngress(ingress)
+	lbPool := argo.getLBPoolForIngress(ingress)
 
-		if t.Active() {
-			return t.Stop()
-		}
-		return nil
-	}
-
-	glog.V(5).Infof("Validation ok for starting %s/%d", key, len(endpoints.Subsets))
-	if !t.Active() {
-		var port int32
-		ingressServicePort := t.Config().ServicePort
-		for _, p := range service.Spec.Ports {
-
-			// equality
-			if (ingressServicePort.Type == intstr.Int && p.Port == ingressServicePort.IntVal) ||
-				(ingressServicePort.Type == intstr.String && p.Name == ingressServicePort.StrVal) {
-				port = p.Port
-			}
-		}
-		if port == 0 {
-			return fmt.Errorf("Unable to match port %s to service %s", ingressServicePort.String(), key)
-		}
-		url := fmt.Sprintf("%s.%s:%d", service.ObjectMeta.Name, service.ObjectMeta.Namespace, port)
-		glog.V(5).Infof("Starting tunnel to url %s", url)
-		return t.Start(url)
+	config := t.Config()
+	if config.LBPool != lbPool || config.ExternalHostname != hostName || config.ServicePort != servicePort || config.ServiceName != serviceName {
+		glog.V(2).Infof("Ingress parameters have changed, recreating tunnel for %s", key)
+		argo.removeTunnel(key)
+		return argo.createTunnel(key, ingress)
 	}
 	return nil
 }
 
-func (argo *ArgoController) removeTunnel(namespace, serviceName string) error {
-	key := fmt.Sprintf("%s/%s", namespace, serviceName)
+// starts or stops the tunnel depending on the existence of
+// the associated service and endpoints
+func (argo *ArgoController) evaluateTunnelStatus(key string) error {
 
-	t := argo.tunnels[key]
+	t := argo.getTunnel(key)
 	if t == nil {
 		return fmt.Errorf("Tunnel not found for key %s", key)
 	}
-	err := t.Stop()
+
+	serviceName := t.Config().ServiceName
+	namespace := t.Config().ServiceNamespace
+
+	service, err := argo.serviceLister.Services(namespace).Get(serviceName)
+	if service == nil || err != nil {
+		glog.V(2).Infof("Service %s not found for tunnel", key)
+		return argo.stopTunnel(t)
+	}
+	endpoints, err := argo.endpointsLister.Endpoints(namespace).Get(serviceName)
+
+	if err != nil || endpoints == nil {
+		glog.V(2).Infof("Endpoints not found for tunnel %s", key)
+		return argo.stopTunnel(t)
+	}
+	readyEndpointCount := 0
+	for _, subset := range endpoints.Subsets {
+		readyEndpointCount = readyEndpointCount + len(subset.Addresses)
+	}
+	if readyEndpointCount == 0 {
+		glog.V(2).Infof("Endpoints not ready for tunnel %s", key)
+		return argo.stopTunnel(t)
+	}
+
+	glog.V(5).Infof("Validation ok for running %s with %d endpoint(s)", key, readyEndpointCount)
+	if !t.Active() {
+		return argo.startTunnel(t, service)
+	}
+
+	return nil
+}
+
+func (argo *ArgoController) startTunnel(t tunnel.Tunnel, service *v1.Service) error {
+
+	var port int32
+	ingressServicePort := t.Config().ServicePort
+	for _, p := range service.Spec.Ports {
+
+		// equality
+		if (ingressServicePort.Type == intstr.Int && p.Port == ingressServicePort.IntVal) ||
+			(ingressServicePort.Type == intstr.String && p.Name == ingressServicePort.StrVal) {
+			port = p.Port
+		}
+	}
+	if port == 0 {
+		return fmt.Errorf("Unable to match port %s to service %s", ingressServicePort.String(), service.ObjectMeta.Name)
+	}
+	url := fmt.Sprintf("%s.%s:%d", service.ObjectMeta.Name, service.ObjectMeta.Namespace, port)
+	glog.V(5).Infof("Starting tunnel to url %s", url)
+	err := t.Start(url)
+
+	if err != nil {
+		return err
+	}
+	return argo.setIngressEndpoint(t, t.Config().ExternalHostname)
+}
+
+func (argo *ArgoController) setIngressEndpoint(t tunnel.Tunnel, hostname string) error {
+	namespace := t.Config().ServiceNamespace
+	ingressName := t.Config().IngressName
+	ingressClient := argo.client.ExtensionsV1beta1().Ingresses(namespace)
+	currentIngress, err := ingressClient.Get(ingressName, meta_v1.GetOptions{})
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("cannot find ingress %v/%v", namespace, ingressName))
+	}
+
+	var lbIngressSet []v1.LoadBalancerIngress
+	if hostname != "" {
+		lbIngressSet = []v1.LoadBalancerIngress{
+			v1.LoadBalancerIngress{
+				Hostname: hostname,
+			},
+		}
+	}
+	currentIngress.Status = v1beta1.IngressStatus{
+		LoadBalancer: v1.LoadBalancerStatus{
+			Ingress: lbIngressSet,
+		},
+	}
+	_, updateErr := ingressClient.UpdateStatus(currentIngress)
+	return updateErr
+}
+
+func (argo *ArgoController) stopTunnel(t tunnel.Tunnel) error {
+	if t.Active() {
+		err := t.Stop()
+		if err != nil {
+			return err
+		}
+		return argo.setIngressEndpoint(t, "")
+	}
+	return nil
+}
+
+func (argo *ArgoController) removeTunnel(key string) error {
+	glog.V(2).Infof("Removing tunnel %s", key)
+	t := argo.getTunnel(key)
+	if t == nil {
+		return fmt.Errorf("Tunnel not found for key %s", key)
+	}
+	err := argo.stopTunnel(t)
+	argo.mux.Lock()
 	delete(argo.tunnels, key)
+	argo.mux.Unlock()
 	return err
 }
 
@@ -700,6 +785,8 @@ func (argo *ArgoController) tearDown() error {
 	for _, t := range argo.tunnels {
 		t.TearDown()
 	}
+	argo.mux.Lock()
 	argo.tunnels = make(map[string]tunnel.Tunnel)
+	argo.mux.Unlock()
 	return nil
 }

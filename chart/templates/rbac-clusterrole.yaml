@@ -14,11 +14,18 @@ rules:
   - ""
   - "extensions"
   resources:
-  - ingresses
-  - services
   - endpoints
+  - services
+  - ingresses
   verbs:
-  - list
   - get
+  - list
   - watch
+- apiGroups:
+  - "extensions"
+  resources:
+  - ingresses/status
+  verbs:
+  - get
+  - update
 {{ end }}

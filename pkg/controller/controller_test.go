@@ -370,8 +370,8 @@ func TestTunnelInitialization(t *testing.T) {
 	assert.NotNil(t, wc.tunnels)
 	assert.Equal(t, 1, len(wc.tunnels))
 
-	key := constructServiceKey(&items.Service)
-	fooTunnel := wc.tunnels[key]
+	key := constructIngressKey(&items.Ingress)
+	fooTunnel := wc.getTunnel(key)
 	if fooTunnel == nil {
 		t.Fatalf("failing, tunnel is nil for %s", key)
 	}
@@ -437,8 +437,8 @@ func TestTunnelServiceInitialization(t *testing.T) {
 	}
 	assert.Equal(t, 1, len(wc.tunnels))
 
-	key := constructServiceKey(&items.Service)
-	fooTunnel := wc.tunnels[key]
+	key := constructIngressKey(&items.Ingress)
+	fooTunnel := wc.getTunnel(key)
 	if fooTunnel == nil {
 		t.Fatalf("failing, tunnel is nil for %s", key)
 	}
@@ -523,8 +523,8 @@ func TestTunnelServicesTwoNS(t *testing.T) {
 	assert.Equal(t, 2, len(wc.tunnels))
 
 	for _, item := range items {
-		key := constructServiceKey(&item.Service)
-		tunnel := wc.tunnels[key]
+		key := constructIngressKey(&item.Ingress)
+		tunnel := wc.getTunnel(key)
 		if tunnel == nil {
 			t.Fatalf("failing, tunnel is nil for %s", key)
 		}

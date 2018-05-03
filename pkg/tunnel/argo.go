@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cloudflare/cloudflare-warp-ingress/pkg/cloudflare"
+	"github.com/cloudflare/cloudflare-ingress-controller/pkg/cloudflare"
 	"github.com/cloudflare/cloudflared/origin"
 	tunnelpogs "github.com/cloudflare/cloudflared/tunnelrpc/pogs"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
@@ -13,8 +13,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// WarpManager manages a single tunnel in a goroutine
-type WarpManager struct {
+// ArgoTunnelManager manages a single tunnel in a goroutine
+type ArgoTunnelManager struct {
 	id           string
 	config       *Config
 	tunnelConfig *origin.TunnelConfig
@@ -22,8 +22,8 @@ type WarpManager struct {
 	stopCh       chan struct{}
 }
 
-// NewWarpManager is a wrapper around a warp tunnel running in a goroutine
-func NewWarpManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, error) {
+// NewArgoTunnelManager is a wrapper around a argo tunnel running in a goroutine
+func NewArgoTunnelManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, error) {
 
 	haConnections := 1
 
@@ -39,25 +39,31 @@ func NewWarpManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, error)
 		Hostname:          config.ExternalHostname,
 		OriginCert:        config.OriginCert, // []byte{}
 		TlsConfig:         &tls.Config{},     // need to load the cloudflare cert
+		ClientTlsConfig:   nil,               // *tls.Config
 		Retries:           5,
 		HeartbeatInterval: 5 * time.Second,
 		MaxHeartbeats:     5,
 		ClientID:          utilrand.String(16),
+		BuildInfo:         origin.GetBuildInfo(),
 		ReportedVersion:   "DEV",
 		LBPool:            config.LBPool,
 		Tags:              []tunnelpogs.Tag{},
 		HAConnections:     haConnections,
+		HTTPTransport:     nil, // http.RoundTripper
 		Metrics:           metricsSetup.Metrics,
 		MetricsUpdateFreq: metricsSetup.UpdateFrequency,
 		ProtocolLogger:    protocolLogger,
 		Logger:            tunnelLogger,
 		IsAutoupdated:     false,
+		GracePeriod:       0,     //time.Duration
+		RunFromTerminal:   false, // bool
+
 	}
 
 	tunnelConfig.TlsConfig.RootCAs = cloudflare.GetCloudflareRootCA()
 	tunnelConfig.TlsConfig.ServerName = "cftunnel.com"
 
-	mgr := WarpManager{
+	mgr := ArgoTunnelManager{
 		id:           utilrand.String(8),
 		config:       config,
 		tunnelConfig: &tunnelConfig,
@@ -67,15 +73,15 @@ func NewWarpManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, error)
 	return &mgr, nil
 }
 
-func (mgr *WarpManager) Config() Config {
+func (mgr *ArgoTunnelManager) Config() Config {
 	return *mgr.config
 }
 
-func (mgr *WarpManager) Active() bool {
+func (mgr *ArgoTunnelManager) Active() bool {
 	return mgr.stopCh != nil
 }
 
-func (mgr *WarpManager) Start(serviceURL string) error {
+func (mgr *ArgoTunnelManager) Start(serviceURL string) error {
 
 	if serviceURL == "" {
 		return fmt.Errorf("Cannot start tunnel for %s with empty url", mgr.Config().ServiceName)
@@ -91,7 +97,7 @@ func (mgr *WarpManager) Start(serviceURL string) error {
 	return nil
 }
 
-func (mgr *WarpManager) Stop() error {
+func (mgr *ArgoTunnelManager) Stop() error {
 	if mgr.stopCh == nil {
 		return fmt.Errorf("tunnel %s already stopped", mgr.id)
 	}
@@ -101,10 +107,10 @@ func (mgr *WarpManager) Stop() error {
 	return <-mgr.errCh
 }
 
-func (mgr *WarpManager) TearDown() error {
+func (mgr *ArgoTunnelManager) TearDown() error {
 	return mgr.Stop()
 }
 
-func (mgr *WarpManager) CheckStatus() error {
+func (mgr *ArgoTunnelManager) CheckStatus() error {
 	return fmt.Errorf("Not implemented")
 }

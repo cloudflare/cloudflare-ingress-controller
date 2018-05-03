@@ -5,7 +5,7 @@ import (
 )
 
 // Tunnel is the interface for different implementation of
-// the cloudflare-warp tunnel, matching an external hostname
+// the argo tunnel, matching an external hostname
 // to a kubernetes service
 type Tunnel interface {
 
@@ -29,7 +29,7 @@ type Tunnel interface {
 }
 
 // Config contains the smallest set of elements to define
-// a warp tunnel
+// an argo tunnel
 type Config struct {
 	ServiceName      string
 	ServiceNamespace string

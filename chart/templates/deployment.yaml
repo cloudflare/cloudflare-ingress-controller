@@ -1,9 +1,9 @@
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: {{ template "cloudflare-warp-ingress.fullname" . }}
+  name: {{ template "cloudflare-argo-ingress.fullname" . }}
   labels:
-    app: {{ template "cloudflare-warp-ingress.name" . }}
+    app: {{ template "cloudflare-argo-ingress.name" . }}
     chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
@@ -12,7 +12,7 @@ spec:
   template:
     metadata:
       labels:
-        app: {{ template "cloudflare-warp-ingress.name" . }}
+        app: {{ template "cloudflare-argo-ingress.name" . }}
         release: {{ .Release.Name }}
     spec:
       affinity:
@@ -25,12 +25,12 @@ spec:
                 - key: app
                   operator: In
                   values:
-                  - {{ template "cloudflare-warp-ingress.name" . }}
+                  - {{ template "cloudflare-argo-ingress.name" . }}
               topologyKey: kubernetes.io/hostname
       containers:
         - name: {{ .Chart.Name }}
           command:
-          - /warp-controller
+          - /argot
           - -v=6
           - -namespace
           - {{ .Release.Namespace }}

@@ -1,12 +1,12 @@
 
 # The binary to build (just the basename).
-BIN := warp-controller
+BIN := argot
 
 # This repo's root import path (under GOPATH).
-PKG := github.com/cloudflare/cloudflare-warp-ingress
+PKG := github.com/cloudflare/cloudflare-ingress-controller
 
 # Where to push the docker image.
-REGISTRY ?= quay.io/stackpoint
+REGISTRY ?= gcr.io/stackpoint-public
 
 # Which architecture to build - see $(ALL_ARCH) for options.
 ARCH ?= amd64

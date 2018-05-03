@@ -20,8 +20,7 @@ Cloudflare Argo Links:
 - [Argo Routing](https://www.cloudflare.com/products/argo-smart-routing/)
 - [Ingress Controller](https://github.com/cloudflare/cloudflare-ingress-controller)
 
-Argo Tunnel was previously known as Cloudflare Warp, and not all components have
-been renamed.
+Argo Tunnel was previously known as Cloudflare Warp.
 
 ### Installation and Configuration
 
@@ -77,16 +76,16 @@ certificate
 
 ```bash
 DOMAIN=mydomain.com
-CERT_B64=$(base64 $HOME/.cloudflare-warp/cert.pem)
-NS="warp"
+CERT_B64=$(base64 $HOME/.cloudflared/cert.pem)
+NS="argo"
 USE_RBAC=true
 
-RELEASE_NAME="warp-$DOMAIN"
+RELEASE_NAME="argo-$DOMAIN"
 
 helm install --name $RELEASE_NAME --namespace $NS \
    --set rbac.install=$USE_RBAC \
    --set secret.install=true,secret.domain=$DOMAIN,secret.certificate_b64=$CERT_B64 \
-   tc/cloudflare-warp-ingress
+   tc/argo-tunnel-ingress
 ```
 
 Helm can install the ingress controller _without_ a certificate, in which case
@@ -117,7 +116,7 @@ items:
     template:
       metadata:
         labels:
-          app: warp-service-app
+          app: argo-service-app
       spec:
         containers:
         - name: httpbin
@@ -130,7 +129,7 @@ items:
     name: httpbin
   spec:
     selector:
-      app: warp-service-app
+      app: argo-service-app
     ports:
     - protocol: TCP
       port: 80
@@ -145,7 +144,7 @@ of controller that should implement the connection.
 
 Our ingress manifest contains
 
-- the cloudflare-warp annotation
+- the argo-tunnel annotation
 - a host url which belongs to the cloudflare domain we own
 - the name of the service -- in the same namespace -- that should be exposed.
 
@@ -155,7 +154,7 @@ kind: Ingress
 metadata:
 name: httpbin
 annotations:
-    kubernetes.io/ingress.class: cloudflare-warp
+    kubernetes.io/ingress.class: argo-tunnel
 spec:
 rules:
 - host: httpbin.anthopleura.net
@@ -171,7 +170,7 @@ When the controller observes the creation of an ingress, it verifies that
 
 - the service exists
 - the endpoints supporting the service (pods of the deployment exist)
-- the cloudflare-warp-cert secret exists
+- the cloudflared-cert secret exists
 
 and opens a tunnel between the cloudflare receiver and the kubernetes virtual
 service ip.
@@ -192,7 +191,7 @@ advanced options, insert a Host header of the desired domain.
 The ingress controller pods can be listed by label with
 
 ```bash
-kubectl get pod -l app=cloudflare-warp-ingress
+kubectl get pod -l app=cloudflare-ingress-controller
 kubectl logs -f [POD_NAME]
 ```
 The ingress controller stdout log is verbose.
@@ -235,7 +234,7 @@ The full controller installation comprises the following kubernetes objects:
 - Istio
 
 Istio offers a useful set of tools for routing, managing and monitoring traffic
-within the kubernetes cluster. By ci connecting argo tunnel traffic into the
+within the kubernetes cluster. By connecting argo tunnel traffic into the
 istio mesh, we want to combine the internal traffic management tools with the
 security of the argo tunnel. This engagement is ongoing.
 
@@ -254,17 +253,27 @@ controller.
 
 ### Contributing
 
-The following commands are a starting point for building the warp-controller code:
+The following commands are a starting point for building the ingress controller code:
 
 ```
-mkdir -p workspace/cloudflare-warp/src/github.com/cloudflare
-export GOPATH=$(pwd)/workspace/cloudflare-warp/
+mkdir -p workspace/cloudflare-argo/src/github.com/cloudflare
+export GOPATH=$(pwd)/workspace/cloudflare-argo/
 
-cd workspace/cloudflare-warp/src/github.com/cloudflare
-git clone https://github.com/cloudflare/cloudflare-warp-ingress/
+cd workspace/cloudflare-argo/src/github.com/cloudflare
+git clone https://github.com/cloudflare/cloudflare-ingress-controller/
 
-cd cloudflare-warp-ingress/
+cd cloudflare-ingress-controller/
 dep ensure
+```
+
+build locally:
+```
+go build ./...
+go test ./...
+```
+
+build in docker, and make docker image
+```
 make container
 ```
 
@@ -272,11 +281,11 @@ This process should retrieve all the necessary dependencies, build the binary,
 and package it as a docker image.  Given that some of the github repositories
 are private, there may or may not be issues retrieving the code. In order to run
 the application in a kubernetes cluster, the image must be pushed to a
-repository.  It is currently being pushed to a quay<span>.</span>io repository,
+repository.  It is currently being pushed to a gcr<span>.</span>io repository,
 and this can be changed editing the references in the Makefile and in the
 _deploy_ manifest.
 
 ### Engage with us
 
-- Engage with us section
-- Community forum link for CF
+- Engage with us 
+- Community forum 

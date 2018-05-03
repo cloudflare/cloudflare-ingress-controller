@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudflare/cloudflare-warp-ingress/pkg/tunnel"
+	"github.com/cloudflare/cloudflare-ingress-controller/pkg/tunnel"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
@@ -25,13 +25,13 @@ import (
 const (
 	maxRetries                = 5
 	ingressClassKey           = "kubernetes.io/ingress.class"
-	cloudflareWarpIngressType = "cloudflare-warp"
-	ingressAnnotationLBPool   = "warp.cloudflare.com/lb-pool"
-	secretLabelDomain         = "warp.cloudflare.com/domain"
+	cloudflareArgoIngressType = "argo-tunnel"
+	ingressAnnotationLBPool   = "argo.cloudflare.com/lb-pool"
+	secretLabelDomain         = "cloudflare-argo/domain"
 )
 
-// WarpController object
-type WarpController struct {
+// ArgoController object
+type ArgoController struct {
 	client kubernetes.Interface
 
 	metricsConfig *tunnel.MetricsConfig
@@ -51,12 +51,12 @@ type WarpController struct {
 	tunnels   map[string]tunnel.Tunnel
 }
 
-func NewWarpController(client kubernetes.Interface, namespace string) *WarpController {
+func NewArgoController(client kubernetes.Interface, namespace string) *ArgoController {
 
 	informer, indexer, queue := createIngressInformer(client)
 	tunnels := make(map[string]tunnel.Tunnel, 0)
 
-	w := &WarpController{
+	argo := &ArgoController{
 		client: client,
 
 		metricsConfig: tunnel.NewDummyMetrics(),
@@ -68,15 +68,15 @@ func NewWarpController(client kubernetes.Interface, namespace string) *WarpContr
 		namespace: namespace,
 		tunnels:   tunnels,
 	}
-	w.configureServiceInformer()
-	w.configureEndpointInformer()
+	argo.configureServiceInformer()
+	argo.configureEndpointInformer()
 
-	return w
+	return argo
 }
 
 // EnableMetrics configures a new metrics config for the controller
-func (w *WarpController) EnableMetrics() {
-	w.metricsConfig = tunnel.NewMetrics()
+func (argo *ArgoController) EnableMetrics() {
+	argo.metricsConfig = tunnel.NewMetrics()
 }
 
 func createIngressInformer(client kubernetes.Interface) (cache.Controller, cache.Indexer, workqueue.RateLimitingInterface) {
@@ -139,7 +139,7 @@ func shouldHandleIngress(obj interface{}) (string, bool) {
 		return "", false
 	}
 	glog.V(5).Infof("Annotation %s=%s", ingressClassKey, val)
-	if val != cloudflareWarpIngressType {
+	if val != cloudflareArgoIngressType {
 		return "", false
 	}
 
@@ -164,16 +164,16 @@ func shouldHandleIngress(obj interface{}) (string, bool) {
 	return constructIngressKey(ingress), true
 }
 
-func (w *WarpController) configureServiceInformer() {
+func (argo *ArgoController) configureServiceInformer() {
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	indexer, informer := cache.NewIndexerInformer(
 
 		&cache.ListWatch{
 			ListFunc: func(lo meta_v1.ListOptions) (runtime.Object, error) {
-				return w.client.CoreV1().Services(v1.NamespaceAll).List(lo)
+				return argo.client.CoreV1().Services(v1.NamespaceAll).List(lo)
 			},
 			WatchFunc: func(lo meta_v1.ListOptions) (watch.Interface, error) {
-				return w.client.CoreV1().Services(v1.NamespaceAll).Watch(lo)
+				return argo.client.CoreV1().Services(v1.NamespaceAll).Watch(lo)
 			},
 		},
 
@@ -187,21 +187,21 @@ func (w *WarpController) configureServiceInformer() {
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				svc, ok := obj.(*v1.Service)
-				if !ok || !w.isWatchedService(svc) {
+				if !ok || !argo.isWatchedService(svc) {
 					return
 				}
 				queue.Add("add:" + constructServiceKey(svc))
 			},
 			UpdateFunc: func(old, new interface{}) {
 				svc, ok := new.(*v1.Service)
-				if !ok || !w.isWatchedService(svc) {
+				if !ok || !argo.isWatchedService(svc) {
 					return
 				}
 				queue.Add("update:" + constructServiceKey(svc))
 			},
 			DeleteFunc: func(obj interface{}) {
 				svc, ok := obj.(*v1.Service)
-				if !ok || !w.isWatchedService(svc) {
+				if !ok || !argo.isWatchedService(svc) {
 					return
 				}
 				queue.Add("delete:" + constructServiceKey(svc))
@@ -209,14 +209,14 @@ func (w *WarpController) configureServiceInformer() {
 		},
 		cache.Indexers{},
 	)
-	w.serviceInformer = informer
-	w.serviceLister = lister_v1.NewServiceLister(indexer)
-	w.serviceWorkqueue = queue
+	argo.serviceInformer = informer
+	argo.serviceLister = lister_v1.NewServiceLister(indexer)
+	argo.serviceWorkqueue = queue
 }
 
 // is this service one of the ones we have a tunnel for?
-func (w *WarpController) isWatchedService(service *v1.Service) bool {
-	for _, tunnel := range w.tunnels {
+func (argo *ArgoController) isWatchedService(service *v1.Service) bool {
+	for _, tunnel := range argo.tunnels {
 		if service.ObjectMeta.Name == tunnel.Config().ServiceName && service.ObjectMeta.Namespace == tunnel.Config().ServiceNamespace {
 			glog.V(5).Infof("Watching service %s/%s", service.ObjectMeta.Namespace, service.ObjectMeta.Name)
 			return true
@@ -225,16 +225,16 @@ func (w *WarpController) isWatchedService(service *v1.Service) bool {
 	return false
 }
 
-func (w *WarpController) configureEndpointInformer() {
+func (argo *ArgoController) configureEndpointInformer() {
 
 	indexer, informer := cache.NewIndexerInformer(
 
 		&cache.ListWatch{
 			ListFunc: func(lo meta_v1.ListOptions) (runtime.Object, error) {
-				return w.client.CoreV1().Endpoints(v1.NamespaceAll).List(lo)
+				return argo.client.CoreV1().Endpoints(v1.NamespaceAll).List(lo)
 			},
 			WatchFunc: func(lo meta_v1.ListOptions) (watch.Interface, error) {
-				return w.client.CoreV1().Endpoints(v1.NamespaceAll).Watch(lo)
+				return argo.client.CoreV1().Endpoints(v1.NamespaceAll).Watch(lo)
 			},
 		},
 
@@ -248,36 +248,36 @@ func (w *WarpController) configureEndpointInformer() {
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				ep, ok := obj.(*v1.Endpoints)
-				if !ok || !w.isWatchedEndpoint(ep) {
+				if !ok || !argo.isWatchedEndpoint(ep) {
 					return
 				}
-				w.serviceWorkqueue.Add("update:" + constructEndpointKey(ep))
+				argo.serviceWorkqueue.Add("update:" + constructEndpointKey(ep))
 			},
 			UpdateFunc: func(old, new interface{}) {
 				ep, ok := new.(*v1.Endpoints)
-				if !ok || !w.isWatchedEndpoint(ep) {
+				if !ok || !argo.isWatchedEndpoint(ep) {
 					return
 				}
-				w.serviceWorkqueue.Add("update:" + constructEndpointKey(ep))
+				argo.serviceWorkqueue.Add("update:" + constructEndpointKey(ep))
 			},
 			DeleteFunc: func(obj interface{}) {
 				ep, ok := obj.(*v1.Endpoints)
-				if !ok || !w.isWatchedEndpoint(ep) {
+				if !ok || !argo.isWatchedEndpoint(ep) {
 					return
 				}
-				w.serviceWorkqueue.Add("update:" + constructEndpointKey(ep))
+				argo.serviceWorkqueue.Add("update:" + constructEndpointKey(ep))
 			},
 		},
 		cache.Indexers{},
 	)
-	w.endpointsInformer = informer
-	w.endpointsLister = lister_v1.NewEndpointsLister(indexer)
+	argo.endpointsInformer = informer
+	argo.endpointsLister = lister_v1.NewEndpointsLister(indexer)
 }
 
 // is this endpoint interesting?
-func (w *WarpController) isWatchedEndpoint(ep *v1.Endpoints) bool {
+func (argo *ArgoController) isWatchedEndpoint(ep *v1.Endpoints) bool {
 
-	for _, tunnel := range w.tunnels {
+	for _, tunnel := range argo.tunnels {
 		if ep.ObjectMeta.Name == tunnel.Config().ServiceName {
 			glog.V(5).Infof("Watching endpoint %s/%s", ep.ObjectMeta.Namespace, ep.ObjectMeta.Name)
 			return true
@@ -286,52 +286,52 @@ func (w *WarpController) isWatchedEndpoint(ep *v1.Endpoints) bool {
 	return false
 }
 
-func (w *WarpController) Run(stopCh chan struct{}) {
-	defer w.ingressWorkqueue.ShutDown()
-	defer w.serviceWorkqueue.ShutDown()
+func (argo *ArgoController) Run(stopCh chan struct{}) {
+	defer argo.ingressWorkqueue.ShutDown()
+	defer argo.serviceWorkqueue.ShutDown()
 
-	glog.Info("Starting WarpController")
+	glog.Info("Starting ArgoController")
 
-	go w.serviceInformer.Run(stopCh)
-	go w.endpointsInformer.Run(stopCh)
-	go w.ingressInformer.Run(stopCh)
+	go argo.serviceInformer.Run(stopCh)
+	go argo.endpointsInformer.Run(stopCh)
+	go argo.ingressInformer.Run(stopCh)
 
 	// Wait for all caches to be synced, before processing items from the queue is started
-	if !cache.WaitForCacheSync(stopCh, w.ingressInformer.HasSynced) {
+	if !cache.WaitForCacheSync(stopCh, argo.ingressInformer.HasSynced) {
 		glog.Error(fmt.Errorf("Timed out waiting for caches to sync"))
 		return
 	}
-	if !cache.WaitForCacheSync(stopCh, w.serviceInformer.HasSynced) {
+	if !cache.WaitForCacheSync(stopCh, argo.serviceInformer.HasSynced) {
 		glog.Error(fmt.Errorf("Timed out waiting for caches to sync"))
 		return
 	}
 
-	go wait.Until(w.runIngressWorker, time.Second, stopCh)
-	go wait.Until(w.runServiceWorker, time.Second, stopCh)
+	go wait.Until(argo.runIngressWorker, time.Second, stopCh)
+	go wait.Until(argo.runServiceWorker, time.Second, stopCh)
 
 	<-stopCh
-	glog.Info("Stopping WarpController ")
-	w.tearDown()
+	glog.Info("Stopping ArgoController ")
+	argo.tearDown()
 }
 
-func (w *WarpController) runIngressWorker() {
-	for w.processNextIngress() {
+func (argo *ArgoController) runIngressWorker() {
+	for argo.processNextIngress() {
 	}
 }
 
-func (w *WarpController) processNextIngress() bool {
+func (argo *ArgoController) processNextIngress() bool {
 
-	key, quit := w.ingressWorkqueue.Get()
+	key, quit := argo.ingressWorkqueue.Get()
 	if quit {
 		return false
 	}
 	// Tell the queue that we are done with processing this key. This unblocks the key for other workers
 	// This allows safe parallel processing because two pods with the same key are never processed in
 	// parallel.
-	defer w.ingressWorkqueue.Done(key)
+	defer argo.ingressWorkqueue.Done(key)
 
-	err := w.processIngress(key.(string))
-	handleErr(err, key, w.ingressWorkqueue)
+	err := argo.processIngress(key.(string))
+	handleErr(err, key, argo.ingressWorkqueue)
 	return true
 }
 
@@ -374,7 +374,7 @@ func parseIngressKey(queueKey string) (string, string, string, string) {
 	return op, namespace, ingressName, serviceName
 }
 
-func (w *WarpController) processIngress(queueKey string) error {
+func (argo *ArgoController) processIngress(queueKey string) error {
 
 	op, namespace, ingressname, serviceName := parseIngressKey(queueKey)
 	key := namespace + "/" + serviceName
@@ -383,8 +383,8 @@ func (w *WarpController) processIngress(queueKey string) error {
 
 	case "add":
 
-		ingress, err := w.ingressLister.Ingresses(namespace).Get(ingressname)
-		tunnel := w.tunnels[key]
+		ingress, err := argo.ingressLister.Ingresses(namespace).Get(ingressname)
+		tunnel := argo.tunnels[key]
 		if tunnel != nil {
 			glog.V(5).Infof("Tunnel \"%s\" (%s) already exists", serviceName, tunnel.Config().ExternalHostname)
 			// return tunnel.CheckStatus()
@@ -392,33 +392,33 @@ func (w *WarpController) processIngress(queueKey string) error {
 		}
 		if err != nil {
 
-			all, _ := w.ingressLister.Ingresses(namespace).List(labels.Everything())
+			all, _ := argo.ingressLister.Ingresses(namespace).List(labels.Everything())
 			glog.V(2).Infof("all ingresses in %s: %v", "*", all)
 
 			return fmt.Errorf("failed to retrieve ingress by name %q: %v", ingressname, err)
 		}
 
-		return w.createTunnel(ingress)
+		return argo.createTunnel(ingress)
 
 	case "delete":
 
-		return w.removeTunnel(namespace, serviceName)
+		return argo.removeTunnel(namespace, serviceName)
 
 	case "update":
 		// Not clear how much work we should put into watching the running state of the tunnel so
 		// lets just do CheckStatus here every time we see an ingress update
 		//
 		// if the ingress has been edited to change the hostname, we should update
-		tunnel := w.tunnels[key]
+		tunnel := argo.tunnels[key]
 
 		if tunnel == nil {
 			glog.V(5).Infof("Ingress %s is missing a tunnel, creating now", serviceName)
 
-			ingress, err := w.ingressLister.Ingresses(namespace).Get(ingressname)
+			ingress, err := argo.ingressLister.Ingresses(namespace).Get(ingressname)
 			if err != nil {
 				return fmt.Errorf("failed to retrieve ingress by key %q: %v", ingressname, err)
 			}
-			return w.createTunnel(ingress)
+			return argo.createTunnel(ingress)
 		}
 
 		// return tunnel.CheckStatus()
@@ -430,29 +430,29 @@ func (w *WarpController) processIngress(queueKey string) error {
 	}
 }
 
-func (w *WarpController) runServiceWorker() {
-	for w.processNextService() {
+func (argo *ArgoController) runServiceWorker() {
+	for argo.processNextService() {
 	}
 }
 
-func (w *WarpController) processNextService() bool {
+func (argo *ArgoController) processNextService() bool {
 
-	key, quit := w.serviceWorkqueue.Get()
+	key, quit := argo.serviceWorkqueue.Get()
 	if quit {
 		return false
 	}
-	defer w.serviceWorkqueue.Done(key)
+	defer argo.serviceWorkqueue.Done(key)
 
-	err := w.processService(key.(string))
-	handleErr(err, key, w.serviceWorkqueue)
+	err := argo.processService(key.(string))
+	handleErr(err, key, argo.serviceWorkqueue)
 	return true
 }
 
-func (w *WarpController) processService(queueKey string) error {
+func (argo *ArgoController) processService(queueKey string) error {
 
 	op, namespace, serviceName := parseServiceKey(queueKey)
 
-	t, found := w.getTunnelForService(namespace, serviceName)
+	t, found := argo.getTunnelForService(namespace, serviceName)
 	if !found {
 		return nil
 	}
@@ -460,13 +460,13 @@ func (w *WarpController) processService(queueKey string) error {
 	switch op {
 
 	case "add":
-		return w.startOrStop(namespace, serviceName)
+		return argo.startOrStop(namespace, serviceName)
 
 	case "delete":
 		return t.Stop()
 
 	case "update":
-		return w.startOrStop(namespace, serviceName)
+		return argo.startOrStop(namespace, serviceName)
 
 	default:
 		return fmt.Errorf("Unhandled operation \"%s\", %s", op, serviceName)
@@ -474,8 +474,8 @@ func (w *WarpController) processService(queueKey string) error {
 	}
 }
 
-func (w *WarpController) getTunnelForService(namespace, serviceName string) (tunnel.Tunnel, bool) {
-	for _, t := range w.tunnels {
+func (argo *ArgoController) getTunnelForService(namespace, serviceName string) (tunnel.Tunnel, bool) {
+	for _, t := range argo.tunnels {
 		if serviceName == t.Config().ServiceName && namespace == t.Config().ServiceNamespace {
 			return t, true
 		}
@@ -501,7 +501,7 @@ func handleErr(err error, key interface{}, queue workqueue.RateLimitingInterface
 }
 
 // returns non-nil error if the ingress is not something we can deal with
-func (w *WarpController) validateIngress(ingress *v1beta1.Ingress) error {
+func (argo *ArgoController) validateIngress(ingress *v1beta1.Ingress) error {
 	rules := ingress.Spec.Rules
 	if len(rules) == 0 {
 		return fmt.Errorf("Cannot create tunnel for ingress with no rules")
@@ -520,40 +520,40 @@ func (w *WarpController) validateIngress(ingress *v1beta1.Ingress) error {
 }
 
 // assumes validation
-func (w *WarpController) getServiceNameForIngress(ingress *v1beta1.Ingress) string {
+func (argo *ArgoController) getServiceNameForIngress(ingress *v1beta1.Ingress) string {
 	return ingress.Spec.Rules[0].HTTP.Paths[0].Backend.ServiceName
 }
 
 // assumes validation
-func (w *WarpController) getServicePortForIngress(ingress *v1beta1.Ingress) intstr.IntOrString {
+func (argo *ArgoController) getServicePortForIngress(ingress *v1beta1.Ingress) intstr.IntOrString {
 	return ingress.Spec.Rules[0].HTTP.Paths[0].Backend.ServicePort
 }
 
 // assumes validation
-func (w *WarpController) getHostNameForIngress(ingress *v1beta1.Ingress) string {
+func (argo *ArgoController) getHostNameForIngress(ingress *v1beta1.Ingress) string {
 	return ingress.Spec.Rules[0].Host
 }
 
 // assumes validation
-func (w *WarpController) getLBPoolForIngress(ingress *v1beta1.Ingress) string {
-	// // disabled: multiple pools per hostname is not yet supported in cloudflare-warp
+func (argo *ArgoController) getLBPoolForIngress(ingress *v1beta1.Ingress) string {
+	// // disabled: multiple pools per hostname is not yet supported in cloudflare-argo
 	// // instead, use the hostname itself as the name of the pool
 	//
 	// lbPoolName := ingress.ObjectMeta.Annotations[ingressAnnotationLBPool]
 	// if lbPoolName == "" {
-	// 	lbPoolName = w.getServiceNameForIngress(ingress) + "." + ingress.ObjectMeta.Namespace
+	// 	lbPoolName = argo.getServiceNameForIngress(ingress) + "." + ingress.ObjectMeta.Namespace
 	// }
 	// return lbPoolName
 	//
-	return w.getHostNameForIngress(ingress)
+	return argo.getHostNameForIngress(ingress)
 }
 
-func (w *WarpController) readSecret(hostname string) (*v1.Secret, error) {
+func (argo *ArgoController) readSecret(hostname string) (*v1.Secret, error) {
 
 	var certSecret *v1.Secret
 	var certSecretList *v1.SecretList
 	// loop over decrements of the hostname
-	certSecretList, err := w.client.CoreV1().Secrets(w.namespace).List(
+	certSecretList, err := argo.client.CoreV1().Secrets(argo.namespace).List(
 		meta_v1.ListOptions{
 			LabelSelector: secretLabelDomain + "=" + hostname,
 		},
@@ -565,9 +565,9 @@ func (w *WarpController) readSecret(hostname string) (*v1.Secret, error) {
 		return &certSecretList.Items[0], nil
 	}
 
-	secretName := "cloudflare-warp-cert"
+	secretName := "cloudflared-cert"
 
-	certSecret, err = w.client.CoreV1().Secrets(w.namespace).Get(secretName, meta_v1.GetOptions{})
+	certSecret, err = argo.client.CoreV1().Secrets(argo.namespace).Get(secretName, meta_v1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -576,12 +576,12 @@ func (w *WarpController) readSecret(hostname string) (*v1.Secret, error) {
 }
 
 // obtains the origin cert for a particular hostname
-func (w *WarpController) readOriginCert(hostname string) ([]byte, error) {
+func (argo *ArgoController) readOriginCert(hostname string) ([]byte, error) {
 	// in the future, we will have multiple secrets
-	// at present the mapping of hostname -> secretname is "*" -> "cloudflare-warp-cert"
-	secretName := "cloudflare-warp-cert"
+	// at present the mapping of hostname -> secretname is "*" -> "cloudflared-cert"
+	secretName := "cloudflared-cert"
 
-	certSecret, err := w.client.CoreV1().Secrets(w.namespace).Get(secretName, meta_v1.GetOptions{})
+	certSecret, err := argo.client.CoreV1().Secrets(argo.namespace).Get(secretName, meta_v1.GetOptions{})
 	if err != nil {
 		return []byte{}, err
 	}
@@ -594,18 +594,18 @@ func (w *WarpController) readOriginCert(hostname string) ([]byte, error) {
 }
 
 // creates a tunnel and stores a reference to it by serviceName
-func (w *WarpController) createTunnel(ingress *v1beta1.Ingress) error {
-	err := w.validateIngress(ingress)
+func (argo *ArgoController) createTunnel(ingress *v1beta1.Ingress) error {
+	err := argo.validateIngress(ingress)
 	if err != nil {
 		return err
 	}
 	glog.V(5).Infof("creating tunnel for ingress %s", ingress.GetName())
-	serviceName := w.getServiceNameForIngress(ingress)
-	servicePort := w.getServicePortForIngress(ingress)
-	hostName := w.getHostNameForIngress(ingress)
-	lbPool := w.getLBPoolForIngress(ingress)
+	serviceName := argo.getServiceNameForIngress(ingress)
+	servicePort := argo.getServicePortForIngress(ingress)
+	hostName := argo.getHostNameForIngress(ingress)
+	lbPool := argo.getLBPoolForIngress(ingress)
 
-	originCert, err := w.readOriginCert(hostName)
+	originCert, err := argo.readOriginCert(hostName)
 	if err != nil {
 		return err
 	}
@@ -619,30 +619,30 @@ func (w *WarpController) createTunnel(ingress *v1beta1.Ingress) error {
 		OriginCert:       originCert,
 	}
 
-	tunnel, err := tunnel.NewWarpManager(config, w.metricsConfig)
+	tunnel, err := tunnel.NewArgoTunnelManager(config, argo.metricsConfig)
 
 	if err != nil {
 		return err
 	}
 	key := fmt.Sprintf("%s/%s", ingress.ObjectMeta.Namespace, serviceName)
-	w.tunnels[key] = tunnel
+	argo.tunnels[key] = tunnel
 	glog.V(5).Infof("added tunnel for ingress %s, service %s", ingress.GetName(), serviceName)
 
-	return w.startOrStop(ingress.ObjectMeta.Namespace, serviceName)
+	return argo.startOrStop(ingress.ObjectMeta.Namespace, serviceName)
 }
 
 // starts or stops the tunnel depending on the existence of
 // the associated service and endpoints
-func (w *WarpController) startOrStop(namespace, serviceName string) error {
+func (argo *ArgoController) startOrStop(namespace, serviceName string) error {
 	glog.V(5).Infof("Start or Stop %s", serviceName)
 
 	key := fmt.Sprintf("%s/%s", namespace, serviceName)
-	t := w.tunnels[key]
+	t := argo.tunnels[key]
 	if t == nil {
 		return fmt.Errorf("Tunnel not found for key %s", key)
 	}
 
-	service, err := w.serviceLister.Services(namespace).Get(serviceName)
+	service, err := argo.serviceLister.Services(namespace).Get(serviceName)
 	if service == nil || err != nil {
 		glog.V(2).Infof("Service %s not found for tunnel", key)
 		if t.Active() {
@@ -650,7 +650,7 @@ func (w *WarpController) startOrStop(namespace, serviceName string) error {
 		}
 		return nil
 	}
-	endpoints, err := w.endpointsLister.Endpoints(namespace).Get(serviceName)
+	endpoints, err := argo.endpointsLister.Endpoints(namespace).Get(serviceName)
 	if err != nil || endpoints == nil || len(endpoints.Subsets) == 0 {
 		glog.V(2).Infof("Endpoints %s not found for tunnel", key)
 
@@ -682,24 +682,24 @@ func (w *WarpController) startOrStop(namespace, serviceName string) error {
 	return nil
 }
 
-func (w *WarpController) removeTunnel(namespace, serviceName string) error {
+func (argo *ArgoController) removeTunnel(namespace, serviceName string) error {
 	key := fmt.Sprintf("%s/%s", namespace, serviceName)
 
-	t := w.tunnels[key]
+	t := argo.tunnels[key]
 	if t == nil {
 		return fmt.Errorf("Tunnel not found for key %s", key)
 	}
 	err := t.Stop()
-	delete(w.tunnels, key)
+	delete(argo.tunnels, key)
 	return err
 }
 
-func (w *WarpController) tearDown() error {
+func (argo *ArgoController) tearDown() error {
 	glog.V(2).Infof("Tearing down tunnels")
 
-	for _, t := range w.tunnels {
+	for _, t := range argo.tunnels {
 		t.TearDown()
 	}
-	w.tunnels = make(map[string]tunnel.Tunnel)
+	argo.tunnels = make(map[string]tunnel.Tunnel)
 	return nil
 }

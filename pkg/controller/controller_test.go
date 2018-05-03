@@ -222,11 +222,11 @@ func TestAction(t *testing.T) {
 
 }
 
-func TestNewWarpController(t *testing.T) {
+func TestNewArgoController(t *testing.T) {
 	controllerNamespace := "cloudflare" // "cloudflare"
 	fakeClient := &fake.Clientset{}
 
-	wc := NewWarpController(fakeClient, controllerNamespace)
+	wc := NewArgoController(fakeClient, controllerNamespace)
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -280,7 +280,7 @@ func getTunnelItems(namespace string) tunnelItems {
 			},
 		},
 	}
-	meta_v1.SetMetaDataAnnotation(&ingress.ObjectMeta, ingressClassKey, cloudflareWarpIngressType)
+	meta_v1.SetMetaDataAnnotation(&ingress.ObjectMeta, ingressClassKey, cloudflareArgoIngressType)
 
 	service := v1.Service{
 		ObjectMeta: meta_v1.ObjectMeta{
@@ -292,7 +292,7 @@ func getTunnelItems(namespace string) tunnelItems {
 	return tunnelItems{
 		Certificate: v1.Secret{
 			ObjectMeta: meta_v1.ObjectMeta{
-				Name:      "cloudflare-warp-cert",
+				Name:      "cloudflared-cert",
 				Namespace: namespace,
 			},
 			Data: map[string][]byte{
@@ -309,10 +309,10 @@ func TestControllerLookups(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 
 	serviceNamespace := "acme"
-	controllerNamespace := "cloudflare" // "cloudflare"
+	controllerNamespace := "cloudflare"
 	items := getTunnelItems(serviceNamespace)
 
-	wc := NewWarpController(fakeClient, controllerNamespace)
+	wc := NewArgoController(fakeClient, controllerNamespace)
 
 	// broken for now
 	// assert.Equal(t, "fooservice", wc.getServiceNameForIngress(&items.Ingress))
@@ -328,7 +328,7 @@ func TestTunnelInitialization(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 
 	serviceNamespace := "acme"
-	controllerNamespace := "cloudflare" // "cloudflare"
+	controllerNamespace := "cloudflare"
 	items := getTunnelItems(serviceNamespace)
 
 	fakeClient.Fake.AddReactor("list", "ingresses", func(action ktesting.Action) (bool, runtime.Object, error) {
@@ -353,7 +353,7 @@ func TestTunnelInitialization(t *testing.T) {
 	fakeClient.Fake.AddWatchReactor("ingresses", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 	fakeClient.Fake.AddWatchReactor("ingresses", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 
-	wc := NewWarpController(fakeClient, controllerNamespace)
+	wc := NewArgoController(fakeClient, controllerNamespace)
 	// wc.EnableMetrics()cw
 
 	stopCh := make(chan struct{})
@@ -385,7 +385,7 @@ func TestTunnelInitialization(t *testing.T) {
 func TestTunnelServiceInitialization(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 
-	controllerNamespace := "cloudflare" // "cloudflare"
+	controllerNamespace := "cloudflare"
 	serviceNamespace := "acme"
 
 	items := getTunnelItems(serviceNamespace)
@@ -408,7 +408,7 @@ func TestTunnelServiceInitialization(t *testing.T) {
 
 	fakeClient.Fake.AddWatchReactor("*", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 
-	wc := NewWarpController(fakeClient, controllerNamespace)
+	wc := NewArgoController(fakeClient, controllerNamespace)
 	// wc.EnableMetrics()cw
 
 	stopCh := make(chan struct{})
@@ -452,7 +452,7 @@ func TestTunnelServiceInitialization(t *testing.T) {
 func TestTunnelServicesTwoNS(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 
-	controllerNamespace := "cloudflare" // "cloudflare"
+	controllerNamespace := "cloudflare"
 
 	items := []tunnelItems{getTunnelItems("target"), getTunnelItems("walmart")}
 
@@ -493,7 +493,7 @@ func TestTunnelServicesTwoNS(t *testing.T) {
 
 	fakeClient.Fake.AddWatchReactor("*", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 
-	wc := NewWarpController(fakeClient, controllerNamespace)
+	wc := NewArgoController(fakeClient, controllerNamespace)
 	// wc.EnableMetrics()cw
 
 	stopCh := make(chan struct{})

@@ -136,9 +136,8 @@ items:
       targetPort: 8080
 ```
 
-The [kubernetes
-ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/) is a
-spec for external connectivity to a kubernetes service. Typically, the ingress
+The [kubernetes ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/)
+is a spec for external connectivity to a kubernetes service. Typically, the ingress
 will contain an annotation, _kubernetes.io/ingress.class_, to hint at the type
 of controller that should implement the connection.
 
@@ -156,14 +155,14 @@ name: httpbin
 annotations:
     kubernetes.io/ingress.class: argo-tunnel
 spec:
-rules:
-- host: httpbin.anthopleura.net
-    http:
-    paths:
-    - path: /
-        backend:
-        serviceName: httpbin
-        servicePort: 80
+  rules:
+  - host: httpbin.example.co
+      http:
+      paths:
+      - path: /
+          backend:
+          serviceName: httpbin
+          servicePort: 80
 ```
 
 When the controller observes the creation of an ingress, it verifies that
@@ -287,5 +286,7 @@ _deploy_ manifest.
 
 ### Engage with us
 
-- Engage with us 
-- Community forum 
+The [Cloudflare community forum](https://community.cloudflare.com/) is a place to
+discuss Argo and Argo Tunnel.
+
+

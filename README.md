@@ -6,7 +6,7 @@ Cloudflare Argo Tunnel is an easy way to expose web servers securely to the
 public internet, and routes traffic between the endpoints through an encrypted
 tunnel and Cloudflare infrastructure. It is integrated with Cloudflare Argo
 routing to provide efficient routing through Cloudflare's datacenters. The
-`cloudflared` application is used to establish the tunnel wehn the web server is
+`cloudflared` application is used to establish the tunnel when the web server is
 running on a host directly.
 
 The Argo Tunnel Ingress Controller uses kubernetes tools to provide routing for

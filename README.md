@@ -72,11 +72,12 @@ repository](http://trusted-charts.stackpoint.io/)
 
 To install the ingress controller with an downloaded certificate, you must
 define a few variables, one of which is the base64-encoded contents of the
-certificate
+certificate.  It's important that the base64 variable be a single line.
 
 ```bash
 DOMAIN=mydomain.com
-CERT_B64=$(base64 $HOME/.cloudflared/cert.pem)
+# invoking base64 without line breaks differs between standard linux and osx
+CERT_B64=$(base64 -w0 ~/.cloudflared/cert.pem || base64 ~/.cloudflared/cert.pem)
 NS="argo"
 USE_RBAC=true
 

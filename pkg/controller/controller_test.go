@@ -320,8 +320,8 @@ func TestControllerLookups(t *testing.T) {
 	assert.Equal(t, "test.example.com", wc.getHostNameForIngress(&items.Ingress))
 	assert.Equal(t, int32(80), wc.getServicePortForIngress(&items.Ingress).IntVal)
 
-	// assert.Equal(t, "fooservice.acme", wc.getLBPoolForIngress(&items.Ingress))
-	assert.Equal(t, "test.example.com", wc.getLBPoolForIngress(&items.Ingress))
+	assert.Equal(t, "testpool", wc.getLBPoolForIngress(&items.Ingress))
+	// assert.Equal(t, "test.example.com", wc.getLBPoolForIngress(&items.Ingress))
 }
 
 func TestTunnelInitialization(t *testing.T) {

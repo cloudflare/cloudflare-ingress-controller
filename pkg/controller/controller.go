@@ -544,16 +544,8 @@ func (argo *ArgoController) getHostNameForIngress(ingress *v1beta1.Ingress) stri
 
 // assumes validation
 func (argo *ArgoController) getLBPoolForIngress(ingress *v1beta1.Ingress) string {
-	// // disabled: multiple pools per hostname is not yet supported in cloudflare-argo
-	// // instead, use the hostname itself as the name of the pool
-	//
-	// lbPoolName := ingress.ObjectMeta.Annotations[ingressAnnotationLBPool]
-	// if lbPoolName == "" {
-	// 	lbPoolName = argo.getServiceNameForIngress(ingress) + "." + ingress.ObjectMeta.Namespace
-	// }
-	// return lbPoolName
-	//
-	return argo.getHostNameForIngress(ingress)
+	// if the value of LBPool is "", caller should assume that loadbalancing is diabled
+	return ingress.ObjectMeta.Annotations[ingressAnnotationLBPool]
 }
 
 func (argo *ArgoController) readSecret(hostname string) (*v1.Secret, error) {

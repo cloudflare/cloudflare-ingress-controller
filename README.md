@@ -197,6 +197,33 @@ The ingress controller stdout log is verbose.
 
 ### High availability
 
+HA configurations require the use of Cloudflare loadbalancing.  If load-balancing
+is enabled on the Cloudflare account, then it can be used by the ingress controller.
+Setting the annotation `argo.cloudflare.com/lb-pool` on the ingress will turn it on.
+The httpbin ingress becomes:
+
+```yaml
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+name: httpbin
+annotations:
+    argo.cloudflare.com/lb-pool: httpbin-pool
+    kubernetes.io/ingress.class: argo-tunnel
+spec:
+  rules:
+  - host: httpbin.example.co
+      http:
+      paths:
+      - path: /
+          backend:
+          serviceName: httpbin
+          servicePort: 80
+```
+
+Loadbalancing makes it possible to run endpoint in multiple namespaces or 
+multiple clusters.
+
 - Spanning clusters
 
 Creating ingresses in other clusters with matching hostnames will simply add

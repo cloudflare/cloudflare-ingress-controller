@@ -1,10 +1,11 @@
 # Default values for cloudflare-argo-ingress.
 
+# replicaCount is used only when loudflare loadbalancing is enabled
 replicaCount: 1
 
 image:
   repository: gcr.io/stackpoint-public/argot
-  tag: 0.5.0
+  tag: 0.5.1
   pullPolicy: IfNotPresent
 
 resources:
@@ -20,6 +21,8 @@ rbac:
   serviceAccount: cloudflare-argo
   roleName: cloudflare-argo
 
+## Cloudflare account details
+
 # The secret contains the base64-encoded origin certificate for your cloudflare domain.
 # Set the install flag false to configure manually in the cluster later.
 # See https://developers.cloudflare.com/argo-tunnel/quickstart/quickstart/ for information on
@@ -28,3 +31,7 @@ secret:
   install: false
   domain: example.co
   certificate_b64: LS0tLS1CRUdJT...insert base64-encoded certificate here
+
+loadbalancing:
+  enabled: false
+

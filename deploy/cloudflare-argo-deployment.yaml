@@ -24,7 +24,7 @@ spec:
       - command:
         - /argot
         - -v=6
-        image: gcr.io/stackpoint-public/argot:0.5.0
+        image: gcr.io/stackpoint-public/argot:0.5.1
         imagePullPolicy: Always
         name: argo-controller
         resources: {}

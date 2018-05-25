@@ -6,7 +6,7 @@ set of credentials assigned the domain {{ .Values.secret.domain }}
 The Cloudflare Argo Tunnel Ingress Controller requires a set of credentials
 installed as a secret named cloudflared-cert
 
-To obtain the credentials for your cloudflare domain, you must use the _cloudflared_ binary 
+To obtain the credentials for your cloudflare domain, you must use the _cloudflared_ binary
 See https://developers.cloudflare.com/argo-tunnel/quickstart/ for more documentation.
 
 Create the secret:
@@ -23,6 +23,16 @@ kubectl --namespace={{ .Release.Namespace }} \
 
 {{ end }}
 
+{{ if .Values.loadbalancing.enabled }}
+The cloudflare ingress controller has been installed as a deployment of {{ .Values.replicaCount }} pod(s)
+replicas, and traffic can routed to them through a cloudflare loadbalancer.  The use of a load-balancer
+is enabled by the presence of an annotation on the ingress, `argo.cloudflare.com/lb-pool` whose
+value should be the name of the service.
+{{- else }}
+The cloudflare ingress controller has been installed as a deployment with a single pod and traffic
+is being routed through a cloudflare hostname without loadbalancing.
+{{- end }}
+
 To set up a argo tunnel to your service, install an ingress of this form:
 
     apiVersion: extensions/v1beta1
@@ -30,6 +40,9 @@ To set up a argo tunnel to your service, install an ingress of this form:
     metadata:
       annotations:
         kubernetes.io/ingress.class: argo-tunnel
+        {{ if .Values.loadbalancing.enabled }}
+        argo.cloudflare.com/lb-pool: [NAME OF SERVICE]
+        {{- end }}
       name: [NAME OF INGRESS]
       namespace: {{ .Release.Namespace }}
     spec:

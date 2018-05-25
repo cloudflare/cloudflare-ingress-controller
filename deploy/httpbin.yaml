@@ -9,7 +9,7 @@ items:
   metadata:
     name: hb
   spec:
-    replicas: 2
+    replicas: 1
     template:
       metadata:
         labels:
@@ -39,7 +39,7 @@ items:
       kubernetes.io/ingress.class: argo-tunnel
   spec:
     rules:
-    - host: hb.example.com
+    - host: hb.example.co
       http:
         paths:
         - path: /

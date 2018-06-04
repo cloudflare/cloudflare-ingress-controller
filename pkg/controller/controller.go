@@ -18,9 +18,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	typed_core_v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	lister_v1 "k8s.io/client-go/listers/core/v1"
 	lister_v1beta1 "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 )
 
@@ -50,6 +53,8 @@ type ArgoController struct {
 	endpointsLister   lister_v1.EndpointsLister
 	endpointsInformer cache.Controller
 
+	recorder record.EventRecorder
+
 	// namespace of the controller
 	namespace string
 
@@ -64,6 +69,13 @@ func NewArgoController(client kubernetes.Interface, namespace string) *ArgoContr
 	informer, indexer, queue := createIngressInformer(client)
 	tunnels := make(map[string]tunnel.Tunnel, 0)
 
+	sink := typed_core_v1.EventSinkImpl{client.CoreV1().Events(namespace)}
+
+	broadcaster := record.NewBroadcaster()
+	broadcaster.StartLogging(glog.Infof)
+	broadcaster.StartRecordingToSink(&sink)
+	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloudflare-ingress-controller"})
+
 	argo := &ArgoController{
 		client: client,
 
@@ -72,10 +84,10 @@ func NewArgoController(client kubernetes.Interface, namespace string) *ArgoContr
 		ingressInformer:  informer,
 		ingressWorkqueue: queue,
 		ingressLister:    lister_v1beta1.NewIngressLister(indexer),
-
-		namespace: namespace,
-		mux:       sync.Mutex{},
-		tunnels:   tunnels,
+		recorder:         recorder,
+		namespace:        namespace,
+		mux:              sync.Mutex{},
+		tunnels:          tunnels,
 	}
 	argo.configureServiceInformer()
 	argo.configureEndpointInformer()
@@ -625,6 +637,7 @@ func (argo *ArgoController) createTunnel(key string, ingress *v1beta1.Ingress) e
 		return err
 	}
 	argo.setTunnel(key, tunnel)
+	argo.recorder.Eventf(ingress, v1.EventTypeNormal, CreateTunnel, "created tunnel for ingress %s, %s", ingressName, key)
 	glog.V(5).Infof("created tunnel for ingress %s,  %s", ingressName, key)
 
 	return argo.evaluateTunnelStatus(key)
@@ -671,13 +684,13 @@ func (argo *ArgoController) evaluateTunnelStatus(key string) error {
 	service, err := argo.serviceLister.Services(namespace).Get(serviceName)
 	if service == nil || err != nil {
 		glog.V(2).Infof("Service %s not found for tunnel", key)
-		return argo.stopTunnel(t)
+		return argo.stopTunnel(t, nil)
 	}
 	endpoints, err := argo.endpointsLister.Endpoints(namespace).Get(serviceName)
 
 	if err != nil || endpoints == nil {
 		glog.V(2).Infof("Endpoints not found for tunnel %s", key)
-		return argo.stopTunnel(t)
+		return argo.stopTunnel(t, service)
 	}
 	readyEndpointCount := 0
 	for _, subset := range endpoints.Subsets {
@@ -685,7 +698,7 @@ func (argo *ArgoController) evaluateTunnelStatus(key string) error {
 	}
 	if readyEndpointCount == 0 {
 		glog.V(2).Infof("Endpoints not ready for tunnel %s", key)
-		return argo.stopTunnel(t)
+		return argo.stopTunnel(t, service)
 	}
 
 	glog.V(5).Infof("Validation ok for running %s with %d endpoint(s)", key, readyEndpointCount)
@@ -718,6 +731,8 @@ func (argo *ArgoController) startTunnel(t tunnel.Tunnel, service *v1.Service) er
 	if err != nil {
 		return err
 	}
+	argo.recorder.Eventf(service, v1.EventTypeNormal, CreateTunnel, "started tunnel to %s", url)
+
 	return argo.setIngressEndpoint(t, t.Config().ExternalHostname)
 }
 
@@ -747,12 +762,13 @@ func (argo *ArgoController) setIngressEndpoint(t tunnel.Tunnel, hostname string)
 	return updateErr
 }
 
-func (argo *ArgoController) stopTunnel(t tunnel.Tunnel) error {
+func (argo *ArgoController) stopTunnel(t tunnel.Tunnel, service *v1.Service) error {
 	if t.Active() {
 		err := t.Stop()
 		if err != nil {
 			return err
 		}
+		argo.recorder.Eventf(service, v1.EventTypeNormal, DeleteTunnel, "stopped tunnel to service %s", service.ObjectMeta.Name)
 		return argo.setIngressEndpoint(t, "")
 	}
 	return nil
@@ -764,7 +780,7 @@ func (argo *ArgoController) removeTunnel(key string) error {
 	if t == nil {
 		return fmt.Errorf("Tunnel not found for key %s", key)
 	}
-	err := argo.stopTunnel(t)
+	err := argo.stopTunnel(t, nil)
 	argo.mux.Lock()
 	delete(argo.tunnels, key)
 	argo.mux.Unlock()

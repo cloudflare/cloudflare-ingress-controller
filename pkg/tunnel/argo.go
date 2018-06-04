@@ -94,6 +94,13 @@ func (mgr *ArgoTunnelManager) Start(serviceURL string) error {
 	go func() {
 		mgr.errCh <- origin.StartTunnelDaemon(mgr.tunnelConfig, mgr.stopCh, placeHolderOnlyConnectedSignal)
 	}()
+
+	go func() {
+		err := <-mgr.errCh
+		if err != nil {
+			mgr.tunnelConfig.Logger.Errorf("error in starting tunnel, %v", err)
+		}
+	}()
 	return nil
 }
 
@@ -104,7 +111,8 @@ func (mgr *ArgoTunnelManager) Stop() error {
 	close(mgr.stopCh)
 	mgr.tunnelConfig.OriginUrl = ""
 	mgr.stopCh = nil
-	return <-mgr.errCh
+	return nil
+	// return <-mgr.errCh
 }
 
 func (mgr *ArgoTunnelManager) TearDown() error {

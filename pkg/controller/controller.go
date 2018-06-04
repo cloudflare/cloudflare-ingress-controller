@@ -544,7 +544,7 @@ func (argo *ArgoController) getHostNameForIngress(ingress *v1beta1.Ingress) stri
 
 // assumes validation
 func (argo *ArgoController) getLBPoolForIngress(ingress *v1beta1.Ingress) string {
-	// if the value of LBPool is "", caller should assume that loadbalancing is diabled
+	// if the value of LBPool is "", caller should assume that loadbalancing is disabled
 	return ingress.ObjectMeta.Annotations[ingressAnnotationLBPool]
 }
 

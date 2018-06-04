@@ -1,6 +1,6 @@
 # Default values for cloudflare-argo-ingress.
 
-# replicaCount is used only when loudflare loadbalancing is enabled
+# replicaCount is used only when cloudflare loadbalancing is enabled
 replicaCount: 1
 
 image:

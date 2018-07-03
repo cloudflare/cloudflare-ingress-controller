@@ -37,6 +37,7 @@ const (
 type ArgoController struct {
 	client kubernetes.Interface
 
+	metricsLabels []string
 	metricsConfig *tunnel.MetricsConfig
 
 	ingressLister    lister_v1beta1.IngressLister
@@ -59,7 +60,7 @@ type ArgoController struct {
 	tunnels map[string]tunnel.Tunnel
 }
 
-func NewArgoController(client kubernetes.Interface, namespace string) *ArgoController {
+func NewArgoController(client kubernetes.Interface, namespace string, metricsLabels []string) *ArgoController {
 
 	informer, indexer, queue := createIngressInformer(client)
 	tunnels := make(map[string]tunnel.Tunnel, 0)
@@ -67,6 +68,7 @@ func NewArgoController(client kubernetes.Interface, namespace string) *ArgoContr
 	argo := &ArgoController{
 		client: client,
 
+		metricsLabels: metricsLabels,
 		metricsConfig: tunnel.NewDummyMetrics(),
 
 		ingressInformer:  informer,
@@ -109,7 +111,7 @@ func (argo *ArgoController) getTunnelsForService(namespace, serviceName string) 
 
 // EnableMetrics configures a new metrics config for the controller
 func (argo *ArgoController) EnableMetrics() {
-	argo.metricsConfig = tunnel.NewMetrics()
+	argo.metricsConfig = tunnel.NewMetrics(argo.metricsLabels)
 }
 
 func createIngressInformer(client kubernetes.Interface) (cache.Controller, cache.Indexer, workqueue.RateLimitingInterface) {

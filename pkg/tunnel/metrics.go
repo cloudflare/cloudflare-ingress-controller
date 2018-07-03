@@ -7,6 +7,7 @@ import (
 
 	"github.com/cloudflare/cloudflared/metrics"
 	"github.com/cloudflare/cloudflared/origin"
+	"github.com/sirupsen/logrus"
 )
 
 // MetricsConfig wraps the argo tunnel metrics in a struct
@@ -17,10 +18,10 @@ type MetricsConfig struct {
 
 // NewMetrics created a set of TunnelMetrics,
 // allows global prometheus objects, which breaks tests
-func NewMetrics() *MetricsConfig {
+func NewMetrics(baseMetricsLabels []string) *MetricsConfig {
 
 	return &MetricsConfig{
-		Metrics:         origin.NewTunnelMetrics(),
+		Metrics:         origin.NewTunnelMetrics(baseMetricsLabels),
 		UpdateFrequency: 5 * time.Second,
 	}
 }
@@ -36,11 +37,11 @@ func NewDummyMetrics() *MetricsConfig {
 	}
 }
 
-func ServeMetrics(port int, shutdownC <-chan struct{}) (err error) {
+func ServeMetrics(port int, shutdownC <-chan struct{}, logger *logrus.Logger) (err error) {
 
 	metricsListener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return err
 	}
-	return metrics.ServeMetrics(metricsListener, shutdownC)
+	return metrics.ServeMetrics(metricsListener, shutdownC, logger)
 }

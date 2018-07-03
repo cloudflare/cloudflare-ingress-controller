@@ -9,12 +9,27 @@ import (
 	"time"
 
 	"github.com/cloudflare/cloudflare-ingress-controller/pkg/controller"
+	"github.com/cloudflare/cloudflare-ingress-controller/pkg/tunnel"
 	"github.com/cloudflare/cloudflare-ingress-controller/pkg/version"
 	"github.com/golang/glog"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+
+	log "github.com/sirupsen/logrus"
 )
+
+func init() {
+	flag.Set("logtostderr", "true")
+
+	// Log as JSON instead of the default text.
+	log.SetFormatter(&log.JSONFormatter{})
+
+	// Output to stdout instead of the default stderr
+	log.SetOutput(os.Stdout)
+
+	log.SetLevel(log.DebugLevel)
+}
 
 func main() {
 
@@ -48,11 +63,23 @@ func main() {
 		glog.Fatalf("Failed to create kubernetes client: %v", err)
 	}
 
-	argo := controller.NewArgoController(client, *namespace)
+	argoMetricsLabels := []string{
+		"application",
+		"origin_service",
+		"hostname",
+	}
+
+	argo := controller.NewArgoController(client, *namespace, argoMetricsLabels)
+
 	argo.EnableMetrics()
 
 	stopCh := make(chan struct{})
 	// defer close(stopCh)
+
+	logger := log.New()
+	go func() {
+		tunnel.ServeMetrics(9090, stopCh, logger)
+	}()
 
 	// crude trap Ctrl^C for better cleanup in testing
 	c := make(chan os.Signal, 2)

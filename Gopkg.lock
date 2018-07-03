@@ -32,6 +32,7 @@
     "h2mux",
     "log",
     "metallog",
+    "metrics",
     "origin",
     "tunnelrpc",
     "tunnelrpc/pogs",
@@ -260,7 +261,10 @@
 
 [[projects]]
   name = "github.com/prometheus/client_golang"
-  packages = ["prometheus"]
+  packages = [
+    "prometheus",
+    "prometheus/promhttp"
+  ]
   revision = "c5b7fccd204277076155f10851dad72b76a49317"
   version = "v0.8.0"
 
@@ -580,6 +584,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "2043083c30e55734bf254c8525c56705090264f722ffb9d870ee75b361209914"
+  inputs-digest = "a467b50b1749be398deb7a3c47529d29d3b9167b7768227a1785f08d3e4dd903"
   solver-name = "gps-cdcl"
   solver-version = 1

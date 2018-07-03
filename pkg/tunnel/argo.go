@@ -91,8 +91,13 @@ func (mgr *ArgoTunnelManager) Start(serviceURL string) error {
 	placeHolderOnlyConnectedSignal := make(chan struct{})
 	mgr.stopCh = make(chan struct{})
 
+	metricsLabels := map[string]string{
+		"application":    "argot",
+		"origin_service": fmt.Sprintf("%s.%s", mgr.Config().ServiceName, mgr.Config().ServiceNamespace),
+		"hostname":       mgr.Config().ExternalHostname,
+	}
 	go func() {
-		mgr.errCh <- origin.StartTunnelDaemon(mgr.tunnelConfig, mgr.stopCh, placeHolderOnlyConnectedSignal)
+		mgr.errCh <- origin.StartTunnelDaemon(mgr.tunnelConfig, mgr.stopCh, placeHolderOnlyConnectedSignal, metricsLabels)
 	}()
 	return nil
 }

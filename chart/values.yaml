@@ -35,3 +35,8 @@ secret:
 loadbalancing:
   enabled: false
 
+metrics:
+  enabled: true
+  servicemonitor:
+    label: metrics
+    value: enabled

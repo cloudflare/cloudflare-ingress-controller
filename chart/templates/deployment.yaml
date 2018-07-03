@@ -41,6 +41,12 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           resources:
+{{- if .Values.metrics.enabled }}
+          ports:
+          - containerPort: 9090
+            name: metrics
+            protocol: TCP
+{{ end }}
 {{ toYaml .Values.resources | indent 12 }}
     {{- if .Values.nodeSelector }}
       nodeSelector:

@@ -15,11 +15,12 @@ import (
 
 // ArgoTunnelManager manages a single tunnel in a goroutine
 type ArgoTunnelManager struct {
-	id           string
-	config       *Config
-	tunnelConfig *origin.TunnelConfig
-	errCh        chan error
-	stopCh       chan struct{}
+	id               string
+	config           *Config
+	tunnelConfig     *origin.TunnelConfig
+	metricsLabelKeys []string
+	errCh            chan error
+	stopCh           chan struct{}
 }
 
 // NewArgoTunnelManager is a wrapper around a argo tunnel running in a goroutine
@@ -64,11 +65,12 @@ func NewArgoTunnelManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, 
 	tunnelConfig.TlsConfig.ServerName = "cftunnel.com"
 
 	mgr := ArgoTunnelManager{
-		id:           utilrand.String(8),
-		config:       config,
-		tunnelConfig: &tunnelConfig,
-		errCh:        make(chan error),
-		stopCh:       nil,
+		id:               utilrand.String(8),
+		config:           config,
+		tunnelConfig:     &tunnelConfig,
+		metricsLabelKeys: metricsSetup.MetricsLabelKeys,
+		errCh:            make(chan error),
+		stopCh:           nil,
 	}
 	return &mgr, nil
 }
@@ -91,11 +93,20 @@ func (mgr *ArgoTunnelManager) Start(serviceURL string) error {
 	placeHolderOnlyConnectedSignal := make(chan struct{})
 	mgr.stopCh = make(chan struct{})
 
-	metricsLabels := map[string]string{
-		"application":    "argot",
-		"origin_service": fmt.Sprintf("%s.%s", mgr.Config().ServiceName, mgr.Config().ServiceNamespace),
-		"hostname":       mgr.Config().ExternalHostname,
+	// derive metrics label values
+	metricsLabelMapping := map[string]string{
+		MetricsAppKey:      "argot",
+		MetricsServiceKey:  fmt.Sprintf("%s.%s", mgr.Config().ServiceName, mgr.Config().ServiceNamespace),
+		MetricsHostnameKey: mgr.Config().ExternalHostname,
 	}
+	metricsLabels := origin.MetricsLabelList{
+		Keys:   mgr.metricsLabelKeys,
+		Values: make([]string, len(mgr.metricsLabelKeys)),
+	}
+	for i, key := range mgr.metricsLabelKeys {
+		metricsLabels.Values[i] = metricsLabelMapping[key]
+	}
+
 	go func() {
 		mgr.errCh <- origin.StartTunnelDaemon(mgr.tunnelConfig, mgr.stopCh, placeHolderOnlyConnectedSignal, metricsLabels)
 	}()

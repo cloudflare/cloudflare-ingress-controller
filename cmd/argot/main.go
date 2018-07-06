@@ -63,13 +63,13 @@ func main() {
 		glog.Fatalf("Failed to create kubernetes client: %v", err)
 	}
 
-	argoMetricsLabels := []string{
-		"application",
-		"origin_service",
-		"hostname",
+	metricsLabelKeys := []string{
+		tunnel.MetricsAppKey,
+		tunnel.MetricsServiceKey,
+		tunnel.MetricsHostnameKey,
 	}
 
-	argo := controller.NewArgoController(client, *namespace, argoMetricsLabels)
+	argo := controller.NewArgoController(client, *namespace, metricsLabelKeys)
 
 	argo.EnableMetrics()
 

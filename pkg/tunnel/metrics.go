@@ -10,19 +10,27 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	MetricsAppKey      = "application"
+	MetricsServiceKey  = "origin_service"
+	MetricsHostnameKey = "hostname"
+)
+
 // MetricsConfig wraps the argo tunnel metrics in a struct
 type MetricsConfig struct {
-	Metrics         *origin.TunnelMetrics
-	UpdateFrequency time.Duration
+	Metrics          *origin.TunnelMetrics
+	UpdateFrequency  time.Duration
+	MetricsLabelKeys []string
 }
 
 // NewMetrics created a set of TunnelMetrics,
 // allows global prometheus objects, which breaks tests
-func NewMetrics(baseMetricsLabels []string) *MetricsConfig {
+func NewMetrics(metricsLabelKeys []string) *MetricsConfig {
 
 	return &MetricsConfig{
-		Metrics:         origin.NewTunnelMetrics(baseMetricsLabels),
-		UpdateFrequency: 5 * time.Second,
+		Metrics:          origin.NewTunnelMetrics(metricsLabelKeys),
+		UpdateFrequency:  5 * time.Second,
+		MetricsLabelKeys: metricsLabelKeys,
 	}
 }
 

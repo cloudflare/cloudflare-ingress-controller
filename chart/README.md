@@ -23,7 +23,7 @@ NS="argo"
 USE_RBAC=true
 ###
 
-RELEASE_NAME="argo-$DOMAIN"
+RELEASE_NAME=$( echo "argo-$DOMAIN" | sed -e 's/\./-/g')
 
 helm install --name $RELEASE_NAME --namespace $NS \
    --set rbac.install=$USE_RBAC \

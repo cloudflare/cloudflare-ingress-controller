@@ -27,6 +27,11 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/cloudflare/brotli-go"
+  packages = ["."]
+  revision = "18c9f6c67e3dfc12e0ddaca748d2887f97a7ac28"
+
+[[projects]]
   name = "github.com/cloudflare/cloudflared"
   packages = [
     "h2mux",
@@ -38,7 +43,8 @@
     "validation",
     "websocket"
   ]
-  revision = "4268bc1a9cfb0b7a527e13d1f6ca28f063e0e290"
+  revision = "6fc6869e4be6c7d51832ea38360ab1010a38cc9c"
+  source = "https://github.com/ntfrnzn/cloudflared.git"
 
 [[projects]]
   name = "github.com/davecgh/go-spew"
@@ -580,6 +586,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "2043083c30e55734bf254c8525c56705090264f722ffb9d870ee75b361209914"
+  inputs-digest = "a0e4cc00c5b1c00921c7c7674ba65d35911dff08c72d1d13672aa6baf376d74c"
   solver-name = "gps-cdcl"
   solver-version = 1

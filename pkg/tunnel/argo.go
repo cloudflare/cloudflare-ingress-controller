@@ -3,9 +3,12 @@ package tunnel
 import (
 	"crypto/tls"
 	"fmt"
+	"net"
+	"net/http"
 	"time"
 
 	"github.com/cloudflare/cloudflare-ingress-controller/pkg/cloudflare"
+	"github.com/cloudflare/cloudflare-ingress-controller/pkg/version"
 	"github.com/cloudflare/cloudflared/origin"
 	tunnelpogs "github.com/cloudflare/cloudflared/tunnelrpc/pogs"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
@@ -22,6 +25,27 @@ type ArgoTunnelManager struct {
 	stopCh       chan struct{}
 }
 
+func newHttpTransport() *http.Transport {
+
+	tlsConfig := &tls.Config{}
+
+	httpTransport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   time.Second * 30,
+			KeepAlive: time.Second * 30,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       time.Second * 90,
+		TLSHandshakeTimeout:   time.Second * 10,
+		ExpectContinueTimeout: time.Second * 1,
+		TLSClientConfig:       tlsConfig,
+	}
+
+	return httpTransport
+}
+
 // NewArgoTunnelManager is a wrapper around a argo tunnel running in a goroutine
 func NewArgoTunnelManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, error) {
 
@@ -33,23 +57,29 @@ func NewArgoTunnelManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, 
 		"service": config.ServiceName,
 	}).Logger
 
+	httpTransport := newHttpTransport()
+	tlsConfig := &tls.Config{
+		RootCAs:    cloudflare.GetCloudflareRootCA(),
+		ServerName: "cftunnel.com",
+	}
+
 	tunnelConfig := origin.TunnelConfig{
-		EdgeAddrs:         []string{"cftunnel.com:7844"},
+		EdgeAddrs:         []string{}, // load default values later, see github.com/cloudflare/cloudflared/blob/master/origin/discovery.go#
 		OriginUrl:         "",
 		Hostname:          config.ExternalHostname,
 		OriginCert:        config.OriginCert, // []byte{}
-		TlsConfig:         &tls.Config{},     // need to load the cloudflare cert
-		ClientTlsConfig:   nil,               // *tls.Config
+		TlsConfig:         tlsConfig,
+		ClientTlsConfig:   httpTransport.TLSClientConfig, // *tls.Config
 		Retries:           5,
 		HeartbeatInterval: 5 * time.Second,
 		MaxHeartbeats:     5,
 		ClientID:          utilrand.String(16),
 		BuildInfo:         origin.GetBuildInfo(),
-		ReportedVersion:   "DEV",
+		ReportedVersion:   version.VERSION,
 		LBPool:            config.LBPool,
 		Tags:              []tunnelpogs.Tag{},
 		HAConnections:     haConnections,
-		HTTPTransport:     nil, // http.RoundTripper
+		HTTPTransport:     httpTransport,
 		Metrics:           metricsSetup.Metrics,
 		MetricsUpdateFreq: metricsSetup.UpdateFrequency,
 		ProtocolLogger:    protocolLogger,
@@ -59,9 +89,6 @@ func NewArgoTunnelManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, 
 		RunFromTerminal:   false, // bool
 
 	}
-
-	tunnelConfig.TlsConfig.RootCAs = cloudflare.GetCloudflareRootCA()
-	tunnelConfig.TlsConfig.ServerName = "cftunnel.com"
 
 	mgr := ArgoTunnelManager{
 		id:           utilrand.String(8),

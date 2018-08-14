@@ -41,7 +41,7 @@ endif
 
 IMAGE := $(REGISTRY)/$(BIN)
 
-BUILD_IMAGE ?= golang:1.9-alpine
+BUILD_IMAGE ?= golang:1.10-alpine
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-container' rule.
 # If you want to build AND push all containers, see the 'all-push' rule.
@@ -69,6 +69,7 @@ bin/$(ARCH)/$(BIN): build-dirs
 	@echo docker run                                                             \
 	    -ti                                                                 \
 	    --rm                                                                \
+	    -v "$$(pwd)/.cache:/.cache"                                         \
 	    -v "$$(pwd)/.go:/go"                                                \
 	    -v "$$(pwd):/go/src/$(PKG)"                                         \
 	    -v "$$(pwd)/bin/$(ARCH):/go/bin"                                    \
@@ -86,6 +87,7 @@ bin/$(ARCH)/$(BIN): build-dirs
 	@docker run                                                             \
 	    -ti                                                                 \
 	    --rm                                                                \
+	    -v "$$(pwd)/.cache:/.cache"                                         \
 	    -v "$$(pwd)/.go:/go"                                                \
 	    -v "$$(pwd):/go/src/$(PKG)"                                         \
 	    -v "$$(pwd)/bin/$(ARCH):/go/bin"                                    \
@@ -107,6 +109,7 @@ shell: build-dirs
 	@docker run                                                             \
 	    -ti                                                                 \
 	    --rm                                                                \
+	    -v "$$(pwd)/.cache:/.cache"                                         \
 	    -v "$$(pwd)/.go:/go"                                                \
 	    -v "$$(pwd):/go/src/$(PKG)"                                         \
 	    -v "$$(pwd)/bin/$(ARCH):/go/bin"                                    \
@@ -133,11 +136,7 @@ container-name:
 
 push: .push-$(DOTFILE_IMAGE) push-name
 .push-$(DOTFILE_IMAGE): .container-$(DOTFILE_IMAGE)
-ifeq ($(findstring gcr.io,$(REGISTRY)),gcr.io)
-	@gcloud docker -- push $(IMAGE):$(VERSION)
-else
 	@docker push $(IMAGE):$(VERSION)
-endif
 	@docker images -q $(IMAGE):$(VERSION) > $@
 
 push-name:
@@ -150,7 +149,7 @@ test: build-dirs
 	@docker run                                                             \
 	    -ti                                                                 \
 	    --rm                                                                \
-	    -u $$(id -u):$$(id -g)                                              \
+	    -v "$$(pwd)/.cache:/.cache"                                         \
 	    -v "$$(pwd)/.go:/go"                                                \
 	    -v "$$(pwd):/go/src/$(PKG)"                                         \
 	    -v "$$(pwd)/bin/$(ARCH):/go/bin"                                    \

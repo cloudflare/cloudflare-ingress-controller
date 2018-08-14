@@ -1,25 +1,14 @@
 {{ if .Values.rbac.install }}
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
   name:  {{ .Values.rbac.roleName }}
 rules:
 - apiGroups:
   - ""
-  - "extensions"
   resources:
-  - endpoints
-  - services
-  - ingresses
+  - secrets
   verbs:
-  - get
   - list
-  - watch
-- apiGroups:
-  - "extensions"
-  resources:
-  - ingresses/status
-  verbs:
   - get
-  - update
 {{ end }}

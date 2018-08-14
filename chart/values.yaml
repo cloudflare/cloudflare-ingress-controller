@@ -5,8 +5,13 @@ replicaCount: 1
 
 image:
   repository: gcr.io/stackpoint-public/argot
-  tag: 0.5.1
+  tag: 0.5.2
   pullPolicy: IfNotPresent
+
+## configure the ingressClass value in order to manage different ingress-controller 
+## deployments each for a different set of ingresses
+## if not set, defaults to the value "argo-tunnel"
+# handledIngressClass: argo-tunnel-custom-value
 
 resources:
   limits:

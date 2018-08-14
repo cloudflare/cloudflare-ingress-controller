@@ -81,12 +81,12 @@ CERT_B64=$(base64 -w0 ~/.cloudflared/cert.pem || base64 ~/.cloudflared/cert.pem)
 NS="argo"
 USE_RBAC=true
 
-RELEASE_NAME="argo-$DOMAIN"
+RELEASE_NAME=$( echo "argo-$DOMAIN" | sed -e 's/\./-/g' )
 
 helm install --name $RELEASE_NAME --namespace $NS \
    --set rbac.install=$USE_RBAC \
    --set secret.install=true,secret.domain=$DOMAIN,secret.certificate_b64=$CERT_B64 \
-   tc/argo-tunnel-ingress
+   tc/argo-ingress
 ```
 
 Helm can install the ingress controller _without_ a certificate, in which case
@@ -222,7 +222,7 @@ spec:
           servicePort: 80
 ```
 
-Loadbalancing makes it possible to run endpoint in multiple namespaces or 
+Loadbalancing makes it possible to run endpoint in multiple namespaces or
 multiple clusters.
 
 - Spanning clusters

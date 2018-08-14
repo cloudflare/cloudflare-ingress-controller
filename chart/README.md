@@ -18,7 +18,10 @@ To deploy Cloudflare Argo Tunnel Ingress Controller:
 ```
 ### set these variables to match your situation
 DOMAIN=mydomain.com
-CERT_B64=$(base64 $HOME/.cloudflared/cert.pem)
+
+CERT_FILE=$HOME/.cloudflared/cert.pem
+CERT_B64=$(base64 $CERT_FILE)
+
 NS="argo"
 USE_RBAC=true
 ###

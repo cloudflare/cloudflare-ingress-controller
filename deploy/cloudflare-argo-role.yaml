@@ -1,16 +1,12 @@
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
   name: cloudflare-argo
 rules:
 - apiGroups:
   - ""
-  - "extensions"
   resources:
-  - ingresses
-  - services
-  - endpoints
+  - secrets
   verbs:
   - list
   - get
-  - watch

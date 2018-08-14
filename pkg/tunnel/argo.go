@@ -131,7 +131,8 @@ func (mgr *ArgoTunnelManager) Stop() error {
 	close(mgr.stopCh)
 	mgr.tunnelConfig.OriginUrl = ""
 	mgr.stopCh = nil
-	return <-mgr.errCh
+	<-mgr.errCh // muxerShutdownError is not an error
+	return nil
 }
 
 func (mgr *ArgoTunnelManager) TearDown() error {

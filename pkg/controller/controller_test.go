@@ -19,6 +19,13 @@ import (
 	ktesting "k8s.io/client-go/testing"
 )
 
+var TestConfig = &Config{
+	IngressClass:   CloudflareArgoIngressType,
+	KubeconfigPath: "",
+	Namespace:      "cloudflare",
+	MaxRetries:     MaxRetries,
+}
+
 func init() {
 	flag.Set("alsologtostderr", fmt.Sprintf("%t", true))
 	var logLevel string
@@ -226,7 +233,7 @@ func TestNewArgoController(t *testing.T) {
 	controllerNamespace := "cloudflare" // "cloudflare"
 	fakeClient := &fake.Clientset{}
 
-	wc := NewArgoController(fakeClient, controllerNamespace)
+	wc := NewArgoController(fakeClient, TestConfig)
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -257,7 +264,7 @@ func getTunnelItems(namespace string) tunnelItems {
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name:        ingressName,
 			Namespace:   namespace,
-			Annotations: map[string]string{ingressAnnotationLBPool: poolName},
+			Annotations: map[string]string{IngressAnnotationLBPool: poolName},
 		},
 		Spec: v1beta1.IngressSpec{
 			Rules: []v1beta1.IngressRule{
@@ -280,7 +287,7 @@ func getTunnelItems(namespace string) tunnelItems {
 			},
 		},
 	}
-	meta_v1.SetMetaDataAnnotation(&ingress.ObjectMeta, ingressClassKey, cloudflareArgoIngressType)
+	meta_v1.SetMetaDataAnnotation(&ingress.ObjectMeta, IngressClassKey, CloudflareArgoIngressType)
 
 	service := v1.Service{
 		ObjectMeta: meta_v1.ObjectMeta{
@@ -309,10 +316,9 @@ func TestControllerLookups(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 
 	serviceNamespace := "acme"
-	controllerNamespace := "cloudflare"
 	items := getTunnelItems(serviceNamespace)
 
-	wc := NewArgoController(fakeClient, controllerNamespace)
+	wc := NewArgoController(fakeClient, TestConfig)
 
 	// broken for now
 	// assert.Equal(t, "fooservice", wc.getServiceNameForIngress(&items.Ingress))
@@ -353,7 +359,7 @@ func TestTunnelInitialization(t *testing.T) {
 	fakeClient.Fake.AddWatchReactor("ingresses", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 	fakeClient.Fake.AddWatchReactor("ingresses", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 
-	wc := NewArgoController(fakeClient, controllerNamespace)
+	wc := NewArgoController(fakeClient, TestConfig)
 	// wc.EnableMetrics()cw
 
 	stopCh := make(chan struct{})
@@ -408,7 +414,7 @@ func TestTunnelServiceInitialization(t *testing.T) {
 
 	fakeClient.Fake.AddWatchReactor("*", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 
-	wc := NewArgoController(fakeClient, controllerNamespace)
+	wc := NewArgoController(fakeClient, TestConfig)
 	// wc.EnableMetrics()cw
 
 	stopCh := make(chan struct{})
@@ -493,7 +499,7 @@ func TestTunnelServicesTwoNS(t *testing.T) {
 
 	fakeClient.Fake.AddWatchReactor("*", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 
-	wc := NewArgoController(fakeClient, controllerNamespace)
+	wc := NewArgoController(fakeClient, TestConfig)
 	// wc.EnableMetrics()cw
 
 	stopCh := make(chan struct{})

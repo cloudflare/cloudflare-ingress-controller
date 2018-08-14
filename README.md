@@ -92,7 +92,8 @@ helm install --name $RELEASE_NAME --namespace $NS \
 Helm can install the ingress controller _without_ a certificate, in which case
 you must follow the Helm chart instructions to inject the secret into the
 cluster. The ingress controller will not be able to create connections without
-the correct certificate.
+the correct certificate. The name of the secret can be changed, but it the label
+for `cloudflare-argo/domain` must match the cloudflare domain.
 
 ### Creating an ingress
 

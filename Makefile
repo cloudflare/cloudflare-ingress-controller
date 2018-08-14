@@ -42,6 +42,7 @@ endif
 IMAGE := $(REGISTRY)/$(BIN)
 
 BUILD_IMAGE ?= golang:1.10-alpine
+
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-container' rule.
 # If you want to build AND push all containers, see the 'all-push' rule.
@@ -66,10 +67,10 @@ build: bin/$(ARCH)/$(BIN)
 
 bin/$(ARCH)/$(BIN): build-dirs
 	@echo "building: $@"
-	@echo docker run                                                             \
+	@echo docker run                                                        \
 	    -ti                                                                 \
 	    --rm                                                                \
-	    -v "$$(pwd)/.cache:/.cache"                                         \
+	    -e GOCACHE=/go/src/$(PKG)/.cache                                    \
 	    -v "$$(pwd)/.go:/go"                                                \
 	    -v "$$(pwd):/go/src/$(PKG)"                                         \
 	    -v "$$(pwd)/bin/$(ARCH):/go/bin"                                    \
@@ -87,7 +88,7 @@ bin/$(ARCH)/$(BIN): build-dirs
 	@docker run                                                             \
 	    -ti                                                                 \
 	    --rm                                                                \
-	    -v "$$(pwd)/.cache:/.cache"                                         \
+	    -e GOCACHE=/go/src/$(PKG)/.cache                                    \
 	    -v "$$(pwd)/.go:/go"                                                \
 	    -v "$$(pwd):/go/src/$(PKG)"                                         \
 	    -v "$$(pwd)/bin/$(ARCH):/go/bin"                                    \
@@ -109,7 +110,7 @@ shell: build-dirs
 	@docker run                                                             \
 	    -ti                                                                 \
 	    --rm                                                                \
-	    -v "$$(pwd)/.cache:/.cache"                                         \
+	    -v "$$(pwd)/.cache:/go/.cache"                                         \
 	    -v "$$(pwd)/.go:/go"                                                \
 	    -v "$$(pwd):/go/src/$(PKG)"                                         \
 	    -v "$$(pwd)/bin/$(ARCH):/go/bin"                                    \
@@ -149,7 +150,7 @@ test: build-dirs
 	@docker run                                                             \
 	    -ti                                                                 \
 	    --rm                                                                \
-	    -v "$$(pwd)/.cache:/.cache"                                         \
+	    -v "$$(pwd)/.cache:/go/.cache"                                      \
 	    -v "$$(pwd)/.go:/go"                                                \
 	    -v "$$(pwd):/go/src/$(PKG)"                                         \
 	    -v "$$(pwd)/bin/$(ARCH):/go/bin"                                    \
@@ -170,4 +171,4 @@ container-clean:
 	rm -rf .container-* .dockerfile-* .push-*
 
 bin-clean:
-	rm -rf .go bin
+	rm -rf .go .cache bin

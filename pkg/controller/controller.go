@@ -297,6 +297,10 @@ func (argo *ArgoController) configureEndpointInformer() {
 // is this endpoint interesting?
 func (argo *ArgoController) isWatchedEndpoint(ep *v1.Endpoints) bool {
 
+	// XXX fix this syncronization
+	argo.mux.Lock()
+	defer argo.mux.Unlock()
+
 	for _, tunnel := range argo.tunnels {
 		if ep.ObjectMeta.Name == tunnel.Config().ServiceName {
 			glog.V(5).Infof("Watching endpoint %s/%s", ep.ObjectMeta.Namespace, ep.ObjectMeta.Name)

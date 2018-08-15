@@ -26,6 +26,10 @@ rbac:
   serviceAccount: cloudflare-argo
   roleName: cloudflare-argo
 
+# Application logging level, higher values give more verbose output
+logging:
+  level: 2
+
 ## Cloudflare account details
 
 # The secret contains the base64-encoded origin certificate for your cloudflare domain.
@@ -37,6 +41,7 @@ secret:
   domain: example.co
   certificate_b64: LS0tLS1CRUdJT...insert base64-encoded certificate here
 
+# Loadbalancing support depends upon the cloudflare account settings
 loadbalancing:
   enabled: false
 

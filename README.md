@@ -19,6 +19,7 @@ Cloudflare Argo Links:
 - [Argo Tunnel](https://developers.cloudflare.com/argo-tunnel/)
 - [Argo Routing](https://www.cloudflare.com/products/argo-smart-routing/)
 - [Ingress Controller](https://github.com/cloudflare/cloudflare-ingress-controller)
+- [Cloudflared](https://github.com/cloudflare/cloudflared/)
 
 Argo Tunnel was previously known as Cloudflare Warp.
 
@@ -240,6 +241,40 @@ cluster, and so allows easy routing of internet traffic into a development
 environment.
 
 
+### Managing multiple domains
+
+The cloudflare certificate is unique to a cloudflare domain. It is installed into the
+ingress-controller namespace and labeled with the domain,
+
+```
+  labels:
+    cloudflare-argo/domain: mydomain.com
+```
+
+When the ingress controller handles an ingress for a particular hostname, it searches by
+label for a matching secret, and uses that token and certificate to open the tunnel.
+
+By adding secrets with other domain labels, a single argo ingress controller can
+manage tunnels for different domain endpoints.
+
+### Multple ingress controllers for different services
+
+The argo ingress controller uses the ingress annotations to determine if it should handle
+the ingress, using the key `argo-tunnel`
+
+```
+    annotations:
+      kubernetes.io/ingress.class: argo-tunnel
+```
+
+The value of this key can be changed, so that multiple ingress controllers can be deployed
+each handling a different set of ingresses
+
+The value can be set in the commandline with the flag `--ingressClass=argo-class-1`, or, when
+doing a helm deployment, setting a parameter `--set handledIngressClass=argo-class-2`.
+Annotating the ingress with the appropriate value will ensure that it is handled by one controller or another.
+
+
 ### Technical details and roadmap
 
 #### Kubernetes components
@@ -250,11 +285,11 @@ The full controller installation comprises the following kubernetes objects:
     Manages one or more instances of the controller, each establishing independent tunnels.
 - _Secret_:
     Contains the cloudflare and tls credentials to establish and manage the tunnels.
-- _ClusterRole_:
-    Defines the RBAC rights for the controller, to read secrets in its own namespace and watch pods, services and ingresses in other namespaces.
+- _ClusterRole_ and _Role_:
+    Defines the RBAC rights for the controller, to read secrets in its own namespace and watch pods, services and ingresses in other namespaces. 
 - _ServiceAccount_:
     Defines an identity for the controller.
-- _ClusterRoleBinding_:
+- _ClusterRoleBinding_ and _RoleBinding_:
     Maps the serviceaccount identity to the role.
 
 #### Roadmap

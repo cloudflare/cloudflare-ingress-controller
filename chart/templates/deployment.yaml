@@ -35,7 +35,7 @@ spec:
         - name: {{ .Chart.Name }}
           command:
           - /argot
-          - --v=6
+          - --v={{ .Values.logging.level }}
           - --namespace
           - {{ .Release.Namespace }}
 {{- if .Values.handledIngressClass }}

@@ -25,3 +25,8 @@
 [[constraint]]
   name = "k8s.io/client-go"
   version = "6.0.0"
+
+[[constraint]]
+name = "github.com/cloudflare/cloudflared"
+source = "https://github.com/ntfrnzn/cloudflared.git"
+revision = "6fc6869e4be6c7d51832ea38360ab1010a38cc9c"

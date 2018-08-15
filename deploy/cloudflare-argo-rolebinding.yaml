@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cloudflare-argo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cloudflare-argo
+subjects:
+- kind: ServiceAccount
+  name: cloudflare-argo
+  namespace: default

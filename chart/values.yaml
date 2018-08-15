@@ -5,8 +5,13 @@ replicaCount: 1
 
 image:
   repository: gcr.io/stackpoint-public/argot
-  tag: 0.5.1
+  tag: 0.5.2
   pullPolicy: IfNotPresent
+
+## configure the ingressClass value in order to manage different ingress-controller 
+## deployments each for a different set of ingresses
+## if not set, defaults to the value "argo-tunnel"
+# handledIngressClass: argo-tunnel-custom-value
 
 resources:
   limits:
@@ -21,6 +26,10 @@ rbac:
   serviceAccount: cloudflare-argo
   roleName: cloudflare-argo
 
+# Application logging level, higher values give more verbose output
+logging:
+  level: 2
+
 ## Cloudflare account details
 
 # The secret contains the base64-encoded origin certificate for your cloudflare domain.
@@ -32,6 +41,7 @@ secret:
   domain: example.co
   certificate_b64: LS0tLS1CRUdJT...insert base64-encoded certificate here
 
+# Loadbalancing support depends upon the cloudflare account settings
 loadbalancing:
   enabled: false
 

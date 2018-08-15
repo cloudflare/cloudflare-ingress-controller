@@ -24,15 +24,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 )
 
-const (
-	maxRetries                = 5
-	ingressClassKey           = "kubernetes.io/ingress.class"
-	cloudflareArgoIngressType = "argo-tunnel"
-	ingressAnnotationLBPool   = "argo.cloudflare.com/lb-pool"
-	secretLabelDomain         = "cloudflare-argo/domain"
-	secretName                = "cloudflared-cert"
-)
-
 // ArgoController object
 type ArgoController struct {
 	client kubernetes.Interface
@@ -59,9 +50,9 @@ type ArgoController struct {
 	tunnels map[string]tunnel.Tunnel
 }
 
-func NewArgoController(client kubernetes.Interface, namespace string) *ArgoController {
+func NewArgoController(client kubernetes.Interface, config *Config) *ArgoController {
 
-	informer, indexer, queue := createIngressInformer(client)
+	informer, indexer, queue := createIngressInformer(client, config.IngressClass)
 	tunnels := make(map[string]tunnel.Tunnel, 0)
 
 	argo := &ArgoController{
@@ -73,7 +64,7 @@ func NewArgoController(client kubernetes.Interface, namespace string) *ArgoContr
 		ingressWorkqueue: queue,
 		ingressLister:    lister_v1beta1.NewIngressLister(indexer),
 
-		namespace: namespace,
+		namespace: config.Namespace,
 		mux:       sync.Mutex{},
 		tunnels:   tunnels,
 	}
@@ -112,8 +103,10 @@ func (argo *ArgoController) EnableMetrics() {
 	argo.metricsConfig = tunnel.NewMetrics()
 }
 
-func createIngressInformer(client kubernetes.Interface) (cache.Controller, cache.Indexer, workqueue.RateLimitingInterface) {
+func createIngressInformer(client kubernetes.Interface, ingressClass string) (cache.Controller, cache.Indexer, workqueue.RateLimitingInterface) {
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	shouldHandleIngress := handleIngressFunction(ingressClass)
+
 	indexer, informer := cache.NewIndexerInformer(
 
 		&cache.ListWatch{
@@ -170,23 +163,25 @@ func createIngressInformer(client kubernetes.Interface) (cache.Controller, cache
 // check the type, annotation and conditions.  Return key, ok
 // key is: namespace+"/"+ingressname+"/"+serviceName
 // allows lookup by either the ingress name or the service name
-func shouldHandleIngress(obj interface{}) (string, bool) {
+func handleIngressFunction(ingressClass string) func(obj interface{}) (string, bool) {
+	return func(obj interface{}) (string, bool) {
 
-	ingress, ok := obj.(*v1beta1.Ingress)
-	if !ok {
-		glog.V(5).Infof("Object is not an ingress, don't handle")
-		return "", false
+		ingress, ok := obj.(*v1beta1.Ingress)
+		if !ok {
+			glog.V(5).Infof("Object is not an ingress, don't handle")
+			return "", false
+		}
+		val, ok := ingress.Annotations[IngressClassKey]
+		if !ok {
+			glog.V(5).Infof("No annotation found for %s", IngressClassKey)
+			return "", false
+		}
+		glog.V(5).Infof("Annotation %s=%s", IngressClassKey, val)
+		if val != ingressClass {
+			return "", false
+		}
+		return constructIngressKey(ingress), true
 	}
-	val, ok := ingress.Annotations[ingressClassKey]
-	if !ok {
-		glog.V(5).Infof("No annotation found for %s", ingressClassKey)
-		return "", false
-	}
-	glog.V(5).Infof("Annotation %s=%s", ingressClassKey, val)
-	if val != cloudflareArgoIngressType {
-		return "", false
-	}
-	return constructIngressKey(ingress), true
 }
 
 func (argo *ArgoController) configureServiceInformer() {
@@ -301,6 +296,10 @@ func (argo *ArgoController) configureEndpointInformer() {
 
 // is this endpoint interesting?
 func (argo *ArgoController) isWatchedEndpoint(ep *v1.Endpoints) bool {
+
+	// XXX fix this syncronization
+	argo.mux.Lock()
+	defer argo.mux.Unlock()
 
 	for _, tunnel := range argo.tunnels {
 		if ep.ObjectMeta.Name == tunnel.Config().ServiceName {
@@ -545,27 +544,34 @@ func (argo *ArgoController) getHostNameForIngress(ingress *v1beta1.Ingress) stri
 // assumes validation
 func (argo *ArgoController) getLBPoolForIngress(ingress *v1beta1.Ingress) string {
 	// if the value of LBPool is "", caller should assume that loadbalancing is disabled
-	return ingress.ObjectMeta.Annotations[ingressAnnotationLBPool]
+	return ingress.ObjectMeta.Annotations[IngressAnnotationLBPool]
 }
 
 func (argo *ArgoController) readSecret(hostname string) (*v1.Secret, error) {
 
 	var certSecret *v1.Secret
-	var certSecretList *v1.SecretList
-	// loop over decrements of the hostname
-	certSecretList, err := argo.client.CoreV1().Secrets(argo.namespace).List(
-		meta_v1.ListOptions{
-			LabelSelector: secretLabelDomain + "=" + hostname,
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-	if len(certSecretList.Items) > 0 {
-		return &certSecretList.Items[0], nil
+
+	elements := strings.Split(hostname, ".")
+	// decrementing is overkill, because the only valid choice is one level down.
+	for i := range elements {
+		domain := strings.Join(elements[i:], ".")
+		certSecretList, err := argo.client.CoreV1().Secrets(argo.namespace).List(
+			meta_v1.ListOptions{
+				LabelSelector: SecretLabelDomain + "=" + domain,
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
+		if len(certSecretList.Items) > 0 {
+			secret := certSecretList.Items[0]
+			glog.V(5).Infof("Secret %s found for label %s=%s", secret.ObjectMeta.Name, SecretLabelDomain, domain)
+			return &secret, nil
+		}
 	}
 
-	certSecret, err = argo.client.CoreV1().Secrets(argo.namespace).Get(secretName, meta_v1.GetOptions{})
+	glog.V(5).Infof("Secret not found for label %s, hostname %s, trying default name %s", SecretLabelDomain, hostname, SecretName)
+	certSecret, err := argo.client.CoreV1().Secrets(argo.namespace).Get(SecretName, meta_v1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -578,14 +584,15 @@ func (argo *ArgoController) readOriginCert(hostname string) ([]byte, error) {
 	// in the future, we will have multiple secrets
 	// at present the mapping of hostname -> secretname is "*" -> "cloudflared-cert"
 
-	certSecret, err := argo.client.CoreV1().Secrets(argo.namespace).Get(secretName, meta_v1.GetOptions{})
+	// certSecret, err := argo.client.CoreV1().Secrets(argo.namespace).Get(SecretName, meta_v1.GetOptions{})
+	certSecret, err := argo.readSecret(hostname)
 	if err != nil {
 		return []byte{}, err
 	}
 	certFileName := "cert.pem"
 	originCert := certSecret.Data[certFileName]
 	if len(originCert) == 0 {
-		return []byte{}, fmt.Errorf("Certificate data not found for host %s in secret %s/%s", hostname, secretName, certFileName)
+		return []byte{}, fmt.Errorf("Certificate data not found for host %s in secret %s/%s", hostname, SecretName, certFileName)
 	}
 	return originCert, nil
 }
@@ -737,20 +744,27 @@ func (argo *ArgoController) setIngressEndpoint(t tunnel.Tunnel, hostname string)
 				Hostname: hostname,
 			},
 		}
+	} else {
+		lbIngressSet = []v1.LoadBalancerIngress{}
 	}
+
 	currentIngress.Status = v1beta1.IngressStatus{
 		LoadBalancer: v1.LoadBalancerStatus{
 			Ingress: lbIngressSet,
 		},
 	}
-	_, updateErr := ingressClient.UpdateStatus(currentIngress)
-	return updateErr
+	_, err = ingressClient.UpdateStatus(currentIngress)
+	if err != nil {
+		glog.V(2).Infof("error updating ingress, %v", err)
+	}
+	return err
 }
 
 func (argo *ArgoController) stopTunnel(t tunnel.Tunnel) error {
 	if t.Active() {
 		err := t.Stop()
 		if err != nil {
+			glog.V(2).Infof("Error stopping tunnel, %v", err)
 			return err
 		}
 		return argo.setIngressEndpoint(t, "")
@@ -759,7 +773,7 @@ func (argo *ArgoController) stopTunnel(t tunnel.Tunnel) error {
 }
 
 func (argo *ArgoController) removeTunnel(key string) error {
-	glog.V(2).Infof("Removing tunnel %s", key)
+	glog.V(5).Infof("Removing tunnel %s", key)
 	t := argo.getTunnel(key)
 	if t == nil {
 		return fmt.Errorf("Tunnel not found for key %s", key)
@@ -772,7 +786,7 @@ func (argo *ArgoController) removeTunnel(key string) error {
 }
 
 func (argo *ArgoController) tearDown() error {
-	glog.V(2).Infof("Tearing down tunnels")
+	glog.V(5).Infof("Tearing down tunnels")
 
 	for _, t := range argo.tunnels {
 		t.TearDown()

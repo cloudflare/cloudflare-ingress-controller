@@ -1,15 +1,12 @@
 package main
 
 import (
-	"flag"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/cloudflare/cloudflare-ingress-controller/pkg/controller"
-	"github.com/cloudflare/cloudflare-ingress-controller/pkg/version"
 	"github.com/golang/glog"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -18,37 +15,30 @@ import (
 
 func main() {
 
-	kubeconfig := flag.String("kubeconfig", "", "Path to a kubeconfig file")
-	namespace := flag.String("namespace", "default", "Namespace to run in")
-	v := flag.Bool("version", false, "prints application version")
+	config, exitNow, err := parseFlags()
 
-	flag.Set("logtostderr", "true")
-	flag.Parse()
-
-	if *v {
-		fmt.Printf("%s %s\n", version.APP_NAME, version.VERSION)
+	if exitNow {
 		os.Exit(0)
 	}
 
-	var client *kubernetes.Clientset
-	var config *rest.Config
-	var err error
+	var kclient *kubernetes.Clientset
+	var kconfig *rest.Config
 
-	if *kubeconfig != "" {
-		config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	if config.KubeconfigPath != "" {
+		kconfig, err = clientcmd.BuildConfigFromFlags("", config.KubeconfigPath)
 	} else {
-		config, err = rest.InClusterConfig()
+		kconfig, err = rest.InClusterConfig()
 	}
 	if err != nil {
 		glog.Fatalf("Failed to get config: %v", err)
 	}
 
-	client, err = kubernetes.NewForConfig(config)
+	kclient, err = kubernetes.NewForConfig(kconfig)
 	if err != nil {
 		glog.Fatalf("Failed to create kubernetes client: %v", err)
 	}
 
-	argo := controller.NewArgoController(client, *namespace)
+	argo := controller.NewArgoController(kclient, config)
 	argo.EnableMetrics()
 
 	stopCh := make(chan struct{})

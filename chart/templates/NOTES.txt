@@ -4,28 +4,27 @@ The Cloudflare Argo Tunnel Ingress Controller is configured with a
 set of credentials assigned the domain {{ .Values.secret.domain }}
 {{ else }}
 The Cloudflare Argo Tunnel Ingress Controller requires a set of credentials
-installed as a secret named cloudflared-cert
+installed as a secret labeled with the domain {{ .Values.secret.domain }}
 
-To obtain the credentials for your cloudflare domain, you must use the _cloudflared_ binary
+Obtain the credentials for your cloudflare domain using the _cloudflared_ binary
 See https://developers.cloudflare.com/argo-tunnel/quickstart/ for more documentation.
 
-Create the secret:
+Create and label the secret. The name of the secret is arbitrary, but it must be labeled
+with the correct cloudflare domain ({{ .Values.secret.domain }}).
 
 kubectl --namespace={{ .Release.Namespace }} \
-    create secret generic cloudflared-cert \
+    create secret generic cloudflared-cert-{{ .Values.secret.domain | replace "." "-"}} \
     --from-file=cert.pem=$HOME/.cloudflared/cert.pem
 
-After creation, the secret should be labeled with the cloudflare domain:
-
 kubectl --namespace={{ .Release.Namespace }} \
-     label secret cloudflared-cert\
-     cloudflare-argo/domain=[example.origin.domain]
+     label secret cloudflared-cert-{{ .Values.secret.domain | replace "." "-"}}\
+     cloudflare-argo/domain={{ .Values.secret.domain }}
 
 {{ end }}
 
 {{ if .Values.loadbalancing.enabled }}
 The cloudflare ingress controller has been installed as a deployment of {{ .Values.replicaCount }} pod(s)
-replicas, and traffic can routed to them through a cloudflare loadbalancer.  The use of a load-balancer
+replicas, and traffic can routed to them through a cloudflare loadbalancer.  The use of a loadbalancer
 is enabled by the presence of an annotation on the ingress, `argo.cloudflare.com/lb-pool` whose
 value should be the name of the service.
 {{- else }}
@@ -40,14 +39,14 @@ To set up a argo tunnel to your service, install an ingress of this form:
     metadata:
       annotations:
         kubernetes.io/ingress.class: argo-tunnel
-        {{ if .Values.loadbalancing.enabled }}
+        {{- if .Values.loadbalancing.enabled }}
         argo.cloudflare.com/lb-pool: [NAME OF SERVICE]
         {{- end }}
       name: [NAME OF INGRESS]
       namespace: {{ .Release.Namespace }}
     spec:
       rules:
-      - host: [NAME].my-cloudflare-domain.com
+      - host: [NAME].{{ .Values.secret.domain }}
         http:
           paths:
           - backend:

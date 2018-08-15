@@ -35,9 +35,13 @@ spec:
         - name: {{ .Chart.Name }}
           command:
           - /argot
-          - -v=6
-          - -namespace
+          - --v=6
+          - --namespace
           - {{ .Release.Namespace }}
+{{- if .Values.handledIngressClass }}
+          - --ingressClass
+          - {{ .Values.handledIngressClass }}
+{{- end }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           resources:

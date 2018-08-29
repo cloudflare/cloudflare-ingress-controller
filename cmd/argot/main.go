@@ -1,17 +1,32 @@
 package main
 
 import (
+	"flag"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/cloudflare/cloudflare-ingress-controller/pkg/controller"
+	"github.com/cloudflare/cloudflare-ingress-controller/pkg/tunnel"
 	"github.com/golang/glog"
+	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
+
+func init() {
+	flag.Set("logtostderr", "true")
+
+	// Log as JSON instead of the default text.
+	log.SetFormatter(&log.JSONFormatter{})
+
+	// Output to stdout instead of the default stderr
+	log.SetOutput(os.Stdout)
+
+	log.SetLevel(log.DebugLevel)
+}
 
 func main() {
 
@@ -44,6 +59,11 @@ func main() {
 
 	stopCh := make(chan struct{})
 	// defer close(stopCh)
+
+	logger := log.New()
+	go func() {
+		tunnel.ServeMetrics(9090, stopCh, logger)
+	}()
 
 	// crude trap Ctrl^C for better cleanup in testing
 	c := make(chan os.Signal, 2)

@@ -18,7 +18,7 @@ func TestArgoTunnelConfig(t *testing.T) {
 		OriginCert:       []byte("this is not a cert"),
 	}
 
-	metricsConfig := NewMetrics()
+	metricsConfig := NewMetrics(ArgoMetricsLabelKeys())
 
 	mgr, err := NewArgoTunnelManager(config, metricsConfig)
 	assert.Nil(t, err)

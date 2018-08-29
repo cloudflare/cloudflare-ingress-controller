@@ -42,12 +42,13 @@
   revision = "18c9f6c67e3dfc12e0ddaca748d2887f97a7ac28"
 
 [[projects]]
-  digest = "1:88cffbd483d62d7421bca1eb977706fd775b07e9207cde8c02b5c72ce391b6e8"
+  digest = "1:0112617fd2325e376e35ee2032ded29446cc77884f413ba912de41143dc10363"
   name = "github.com/cloudflare/cloudflared"
   packages = [
     "h2mux",
     "log",
     "metallog",
+    "metrics",
     "origin",
     "tunnelrpc",
     "tunnelrpc/pogs",
@@ -55,8 +56,8 @@
     "websocket",
   ]
   pruneopts = ""
-  revision = "6fc6869e4be6c7d51832ea38360ab1010a38cc9c"
-  source = "https://github.com/ntfrnzn/cloudflared.git"
+  revision = "5e7151649a6d8f6f07a3b6137b00054feeea7a49"
+  source = "https://github.com/StackPointCloud/cloudflared.git"
 
 [[projects]]
   digest = "1:56c130d885a4aacae1dd9c7b71cfe39912c7ebc1ff7d2b46083c8812996dc43b"
@@ -343,7 +344,10 @@
 [[projects]]
   digest = "1:4142d94383572e74b42352273652c62afec5b23f325222ed09198f46009022d1"
   name = "github.com/prometheus/client_golang"
-  packages = ["prometheus"]
+  packages = [
+    "prometheus",
+    "prometheus/promhttp",
+  ]
   pruneopts = ""
   revision = "c5b7fccd204277076155f10851dad72b76a49317"
   version = "v0.8.0"
@@ -701,6 +705,7 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/cloudflare/cloudflared/metrics",
     "github.com/cloudflare/cloudflared/origin",
     "github.com/cloudflare/cloudflared/tunnelrpc/pogs",
     "github.com/golang/glog",

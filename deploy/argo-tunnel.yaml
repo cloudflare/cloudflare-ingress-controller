@@ -1,0 +1,114 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-tunnel
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argo-tunnel
+rules:
+- apiGroups:
+  - ""
+  - "extensions"
+  resources:
+  - ingresses
+  - services
+  - endpoints
+  verbs:
+  - list
+  - get
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argo-tunnel
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argo-tunnel
+subjects:
+- kind: ServiceAccount
+  name: argo-tunnel
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-tunnel
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - list
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-tunnel
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argo-tunnel
+subjects:
+- kind: ServiceAccount
+  name: argo-tunnel
+  namespace: default
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: argo-tunnel
+  name: argo-tunnel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: argo-tunnel
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: argo-tunnel
+    spec:
+      containers:
+      - image: gcr.io/stackpoint-public/argot:0.5.2
+        imagePullPolicy: Always
+        name: argo-tunnel
+        command: ["/argot"]
+        args:
+        - --v=2
+        - --ingressClass=argo-tunnel
+        - --namespace=$(POD_NAMESPACE)
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      serviceAccount: argo-tunnel
+      serviceAccountName: argo-tunnel
+      terminationGracePeriodSeconds: 30
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: argo-tunnel
+              topologyKey: kubernetes.io/hostname

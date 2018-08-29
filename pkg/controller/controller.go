@@ -50,6 +50,13 @@ type ArgoController struct {
 	tunnels map[string]tunnel.Tunnel
 }
 
+type Config struct {
+	IngressClass   string
+	KubeconfigPath string
+	Namespace      string
+	MaxRetries     int
+}
+
 func NewArgoController(client kubernetes.Interface, config *Config) *ArgoController {
 
 	informer, indexer, queue := createIngressInformer(client, config.IngressClass)

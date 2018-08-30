@@ -304,7 +304,7 @@ func (argo *ArgoController) configureEndpointInformer() {
 // is this endpoint interesting?
 func (argo *ArgoController) isWatchedEndpoint(ep *v1.Endpoints) bool {
 
-	// XXX fix this syncronization
+	// XXX fix this synchronization
 	argo.mux.Lock()
 	defer argo.mux.Unlock()
 
@@ -491,7 +491,7 @@ func (argo *ArgoController) processService(queueKey string) error {
 		}
 	}
 	if errorMessage != "" {
-		return fmt.Errorf("at least one error occured handling %s: %s", queueKey, errorMessage)
+		return fmt.Errorf("at least one error occurred handling %s: %s", queueKey, errorMessage)
 	}
 	return nil
 
@@ -747,7 +747,7 @@ func (argo *ArgoController) setIngressEndpoint(t tunnel.Tunnel, hostname string)
 	var lbIngressSet []v1.LoadBalancerIngress
 	if hostname != "" {
 		lbIngressSet = []v1.LoadBalancerIngress{
-			v1.LoadBalancerIngress{
+			{
 				Hostname: hostname,
 			},
 		}

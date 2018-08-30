@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/fake"
 	ktesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 )
 
 var TestConfig = &Config{
@@ -52,7 +53,7 @@ func checkServiceKey(t *testing.T, check serviceKeyCheck) {
 func TestServiceKey(t *testing.T) {
 
 	checks := []serviceKeyCheck{
-		serviceKeyCheck{
+		{
 			"add:default/nginx",
 			"add",
 			"default",
@@ -64,7 +65,7 @@ func TestServiceKey(t *testing.T) {
 				},
 			},
 		},
-		serviceKeyCheck{
+		{
 			"delete:acme/nginx",
 			"delete",
 			"acme",
@@ -76,7 +77,7 @@ func TestServiceKey(t *testing.T) {
 				},
 			},
 		},
-		serviceKeyCheck{
+		{
 			"update:acme/nginx",
 			"update",
 			"acme",
@@ -113,11 +114,11 @@ func TestIngressKey(t *testing.T) {
 
 	ingressSpecNginx := v1beta1.IngressSpec{
 		Rules: []v1beta1.IngressRule{
-			v1beta1.IngressRule{
+			{
 				IngressRuleValue: v1beta1.IngressRuleValue{
 					HTTP: &v1beta1.HTTPIngressRuleValue{
 						Paths: []v1beta1.HTTPIngressPath{
-							v1beta1.HTTPIngressPath{
+							{
 								Backend: v1beta1.IngressBackend{
 									ServiceName: "nginx",
 								},
@@ -130,7 +131,7 @@ func TestIngressKey(t *testing.T) {
 	}
 
 	checks := []ingressKeyCheck{
-		ingressKeyCheck{
+		{
 			"add:default/nginx-in/nginx",
 			"add",
 			"default",
@@ -144,7 +145,7 @@ func TestIngressKey(t *testing.T) {
 				Spec: ingressSpecNginx,
 			},
 		},
-		ingressKeyCheck{
+		{
 			"delete:acme/nginx-in/nginx",
 			"delete",
 			"acme",
@@ -158,7 +159,7 @@ func TestIngressKey(t *testing.T) {
 				Spec: ingressSpecNginx,
 			},
 		},
-		ingressKeyCheck{
+		{
 			"update:acme/nginx-in/nginx",
 			"update",
 			"acme",
@@ -268,12 +269,12 @@ func getTunnelItems(namespace string) tunnelItems {
 		},
 		Spec: v1beta1.IngressSpec{
 			Rules: []v1beta1.IngressRule{
-				v1beta1.IngressRule{
+				{
 					Host: "test.example.com",
 					IngressRuleValue: v1beta1.IngressRuleValue{
 						HTTP: &v1beta1.HTTPIngressRuleValue{
 							Paths: []v1beta1.HTTPIngressPath{
-								v1beta1.HTTPIngressPath{
+								{
 									Path: "/",
 									Backend: v1beta1.IngressBackend{
 										ServiceName: serviceName,
@@ -506,8 +507,10 @@ func TestTunnelServicesTwoNS(t *testing.T) {
 	defer close(stopCh)
 	go wc.Run(stopCh)
 
-	// wait for cache sync
-	time.Sleep(time.Second)
+	cache.WaitForCacheSync(stopCh,
+		wc.ingressInformer.HasSynced,
+		wc.serviceInformer.HasSynced,
+	)
 
 	// add the service now
 	fakeClient.Fake.AddReactor("list", "services", func(action ktesting.Action) (bool, runtime.Object, error) {
@@ -520,6 +523,7 @@ func TestTunnelServicesTwoNS(t *testing.T) {
 	getServiceAction := ktesting.NewCreateAction(serviceResource, items[0].Ingress.GetNamespace(), &items[0].Service)
 	_, _ = fakeClient.Invokes(getServiceAction, &v1.Service{})
 
+	// XXX - fix explicit sleep
 	time.Sleep(5 * time.Second)
 
 	assert.Equal(t, wc.namespace, controllerNamespace)

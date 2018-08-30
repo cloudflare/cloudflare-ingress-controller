@@ -7,26 +7,19 @@ matching `mydomain.com` and `*.mydomain.com`.  To configure tunnels for subdomai
 we'll need to generate additional certificates.
 
 > The guide builds on [Setup Your First Tunnel][guide-first-tunnel].
+
 > `subdomain.mydomain.com` is a place holder. Updated the value to match your Cloudflare domain.
 
 ### Step 1: Create a Subdomain Certificate
 Certificates are located under [Crypto][cloudflare-dashboard-crypto] on the Cloudflare dashboard.
 - Browse to [Crypto][cloudflare-dashboard-crypto].
-- Click `Create Certificate`
-- Select the private key type `ECDSA`
-- Set domains `subdomain.mydomain.com` and `*.subdomain.mydomain.com`
-- Click `Next`
-- Save both the `Private Key` and `Certificate` to a file `cert.pem`
+- Click `Create Certificate`.
+- Select the private key type `ECDSA`.
+- Set domains `subdomain.mydomain.com` and `*.subdomain.mydomain.com`.
+- Click `Next`.
+- Save both the `Private Key` and `Certificate` to a file `cert.pem`.
 
-```
------BEGIN PRIVATE KEY-----
-PRIVATE_KEY_CONTENTS
------END PRIVATE KEY-----
------BEGIN CERTIFICATE-----
-CERTIFICATE_CONTENTS
------END CERTIFICATE-----
-```
-> Copy and paste the entire contents, including the section tags. 
+> Save the entire contents with-in and including the section tags. 
 
 ### Step 2: Append the Tunnel Token
 ```bash
@@ -53,8 +46,8 @@ kubectl apply -f deploy/echo.yaml
 
 ### Step 5: Verify the Tunnel
 The tunnel will be visible under [DNS][cloudflare-dashboard-dns] on the Cloudflare dashboard.
-- Browse to [Cloudflare: DNS][cloudflare-dashboard-dns]
-- Browse to `echo.subdomain.mydomain.com`
+- Browse to [Cloudflare: DNS][cloudflare-dashboard-dns].
+- Browse to `echo.subdomain.mydomain.com`.
 
 > Adjust the Ingress host `echo.subdomain.mydomain.com` to match your Cloudflare domain.
 

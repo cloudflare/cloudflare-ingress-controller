@@ -19,8 +19,9 @@ kubectl logs -l "app=argo-tunnel" --since=10m
 Custom Health Checks can be defined under the [Traffic][cloudflare-dashboard-traffic] tab
 on the Cloudflare dashboard.
 
-- Navigate to the [Traffic tab][cloudflare-dashboard-traffic]
+- Navigate to [Traffic][cloudflare-dashboard-traffic].
 - Create a health check monitor.
 - Verify a status code of "2xx" and insert a Host header for the domain.
 
 [cloudflare-dashboard-analytics]: https://www.cloudflare.com/a/analytics
+[cloudflare-dashboard-traffic]: https://www.cloudflare.com/a/traffic/

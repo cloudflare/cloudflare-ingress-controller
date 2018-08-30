@@ -15,8 +15,8 @@ If it’s your first time using Argo, navigate to the
 [Traffic tab of the Cloudflare dashboard][cloudflare-dashboard-traffic],
 click the ‘Enable’ button, and follow the steps on the screen for setting up
 usage-based billing.
-- Browse to [Cloudflare: Traffic][cloudflare-dashboard-traffic]
-- Locate `Argo` and click `Enable`
+- Browse to [Cloudflare: Traffic][cloudflare-dashboard-traffic].
+- Locate `Argo` and click `Enable`.
 
 > Enterprise customers who have enabled Argo will need to contact their Cloudflare
 > representative to have Smart Routing enabled for their account as it is necessary
@@ -89,8 +89,8 @@ kubectl apply -f deploy/echo.yaml
 
 ### Step 6: Verify the Tunnel
 The tunnel will be visible under [DNS][cloudflare-dashboard-dns] on the Cloudflare dashboard.
-- Browse to [Cloudflare: DNS][cloudflare-dashboard-dns]
-- Browse to `echo.mydomain.com`
+- Browse to [Cloudflare: DNS][cloudflare-dashboard-dns].
+- Browse to `echo.mydomain.com`.
 
 > Adjust the Ingress host `echo.mydomain.com` to match your Cloudflare domain.
 

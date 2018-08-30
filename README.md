@@ -42,7 +42,7 @@ Argo, Argo Tunnel, or any Cloudflare product.
 [argo-tunnel-reference]: https://developers.cloudflare.com/argo-tunnel/reference/
 [argo-tunnel-quick-start]: https://developers.cloudflare.com/argo-tunnel/quickstart/
 [cloudflare-community]: https://community.cloudflare.com
-[conduct]: /docs/code_of_conduct.md
+[conduct]: ./CODE_OF_CONDUCT.md
 [contributing]: /docs/contributing.md
 [controls]: /docs/controls.md
 [guide-first-tunnel]: /docs/guide_first_tunnel.md

@@ -17,7 +17,7 @@ traffic across all tunnels.
 On the Cloudflare dashboard, browse to [Traffic][cloudflare-dashboard-traffic]
 and create a load balancer named `echo-lb-pool`. Additional details can be found
 at [Argo Tunnel: Load-Balancing][cloudflare-reference-load-balancing]
-- Browse to [Argo Tunnel: Load-Balancing][cloudflare-reference-load-balancing]
+- Browse to [Argo Tunnel: Load-Balancing][cloudflare-reference-load-balancing].
 
 ### Step 2: Annotate the Ingress
 Add the annotation `argo.cloudflare.com/lb-pool=echo-lb-pool` the `echo` Ingress.

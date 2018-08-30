@@ -15,7 +15,7 @@ import (
 
 func main() {
 
-	config, exitNow, err := parseFlags()
+	config, exitNow, _ := parseFlags()
 
 	if exitNow {
 		os.Exit(0)
@@ -23,6 +23,7 @@ func main() {
 
 	var kclient *kubernetes.Clientset
 	var kconfig *rest.Config
+	var err error
 
 	if config.KubeconfigPath != "" {
 		kconfig, err = clientcmd.BuildConfigFromFlags("", config.KubeconfigPath)

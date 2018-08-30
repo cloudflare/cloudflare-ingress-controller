@@ -20,8 +20,8 @@ VERSION ?= $(shell git describe --tags --always --dirty)
 ###
 ### These variables should not need tweaking.
 ###
-
-SRC_DIRS := cmd pkg # directories which hold app source (not vendored)
+SRC_DIRS := ./cmd ./pkg # directories which hold app source (not vendored)
+SRC_FILES := $(shell go list ./cmd/... ./pkg/...)
 
 ALL_ARCH := amd64 arm arm64 ppc64le
 
@@ -146,7 +146,7 @@ push-name:
 version:
 	@echo $(VERSION)
 
-test: build-dirs
+test-safe: build-dirs
 	@docker run                                                             \
 	    -ti                                                                 \
 	    --rm                                                                \
@@ -172,3 +172,37 @@ container-clean:
 
 bin-clean:
 	rm -rf .go .cache bin
+
+check: test vet gofmt staticcheck unused misspell
+
+install:
+	go install -v ./...
+
+test: install
+	go test ./...
+
+test-race: | test
+	go test -race ./...
+
+vet: | test
+	go vet ./...
+
+gofmt:  
+	@echo Checking code is gofmted
+	@test -z "$(shell gofmt -s -l -d -e $(SRC_DIRS) | tee /dev/stderr)"
+
+staticcheck:
+	@go get honnef.co/go/tools/cmd/staticcheck
+	staticcheck $(SRC_FILES)
+
+unused:
+	@go get honnef.co/go/tools/cmd/unused
+	unused -exported $(SRC_FILES)
+
+misspell:
+	@go get github.com/client9/misspell/cmd/misspell
+	misspell \
+		-i clas \
+		-locale US \
+		-error \
+		cmd/* pkg/* docs/* *.md

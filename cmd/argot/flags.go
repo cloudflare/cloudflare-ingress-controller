@@ -8,9 +8,6 @@ import (
 	"github.com/cloudflare/cloudflare-ingress-controller/pkg/version"
 )
 
-func printVersion() {
-
-}
 func parseFlags() (*controller.Config, bool, error) {
 
 	exitEarly := false

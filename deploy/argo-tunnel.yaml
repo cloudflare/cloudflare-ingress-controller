@@ -82,10 +82,10 @@ spec:
         app: argo-tunnel
     spec:
       containers:
-      - image: gcr.io/stackpoint-public/argot:0.5.2
+      - image: gcr.io/cloudflare-registry/argo-tunnel:0.5.2
         imagePullPolicy: Always
         name: argo-tunnel
-        command: ["/argot"]
+        command: ["argot"]
         args:
         - --v=2
         - --ingressClass=argo-tunnel

@@ -1,0 +1,24 @@
+# Default values for cloudflare argo-tunnel ingress.
+controller:
+  name: controller
+  image:
+    repository: gcr.io/stackpoint-public/argot
+    tag: "0.5.2"
+    pullPolicy: Always
+  ingressClass: argo-tunnel
+  logLevel: 2
+  replicaCount: 1
+
+# Enable load balancing
+# requires load balancing enabled on the cloudflare account.
+loadBalancing:
+  enabled: false
+
+# Enable rbac
+rbac:
+  create: true
+  name:
+
+serviceAccount:
+  create: true
+  name:

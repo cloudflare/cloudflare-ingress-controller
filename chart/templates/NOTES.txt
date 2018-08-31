@@ -1,0 +1,33 @@
+The Cloudflare Argo Tunnel Ingress Controller has been installed.
+
+The ingress controller requires domain credentials to create Argo Tunnels.
+Obtain the credentials for your cloudflare domain using the _cloudflared_ binary.
+ - See https://developers.cloudflare.com/argo-tunnel/quickstart/
+
+ Create and label the secret. The name of the secret does NOT matter.
+ The secret MUST be labeled with the associated cloudflare domain.
+
+ kubectl -n={{ .Release.Namespace }} \
+    create secret generic mydomain-tunnel-cert \
+    --from-file=cert.pem="$HOME/.cloudflared/cert.pem"
+
+kubectl -n={{ .Release.Namespace }} \
+     label secret mydomain-tunnel-cert \
+     "cloudflare-argo/domain=mydomain.com"
+
+{{ if .Values.loadBalancing.enabled }}
+Load balancing has been enabled for the deployment.
+Loab balancing MUST also be enabled for the cloudflare account.
+
+To use a load balancer, annotate the ingress with `argo.cloudflare.com/lb-pool`
+matching a named loadbalancer defined in the cloudflare dashboard.
+ - See https://www.cloudflare.com/a/traffic/
+
+kubectl annotate ingress mydomain-tunnel \
+     "argo.cloudflare.com/lb-pool=mydomain-lb-pool"
+{{- end }}
+
+References
+ - Reference: https://developers.cloudflare.com/argo-tunnel/reference/ 
+ - QuickStart: https://developers.cloudflare.com/argo-tunnel/quickstart/
+ - Dashboard: https://www.cloudflare.com/a/traffic/

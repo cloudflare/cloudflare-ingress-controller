@@ -1,0 +1,19 @@
+{{- if .Values.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app: {{ template "argo-tunnel.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+  name: {{ template "argo-tunnel.roleName" . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ template "argo-tunnel.roleName" . }}
+subjects:
+- kind: ServiceAccount
+  name: {{ template "argo-tunnel.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+{{- end }}

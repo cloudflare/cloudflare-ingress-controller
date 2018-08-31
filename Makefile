@@ -205,4 +205,4 @@ misspell:
 		-i clas \
 		-locale US \
 		-error \
-		cmd/* pkg/* docs/* *.md
+		cmd/* pkg/* docs/* chart/*.md *.md

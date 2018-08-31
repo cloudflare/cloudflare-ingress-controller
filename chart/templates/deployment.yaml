@@ -1,0 +1,67 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ template "argo-tunnel.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+  name: {{ template "argo-tunnel.fullname" . }}
+spec:
+  {{- if .Values.loadBalancing.enabled }}
+  replicas: {{ .Values.controller.replicaCount }}
+  {{- else }}
+  replicas: 1
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ template "argo-tunnel.name" . }}
+      component: {{ .Values.controller.name }}
+      release: {{ .Release.Name }}
+strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: {{ template "argo-tunnel.name" . }}
+        component: {{ .Values.controller.name }}
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+      - name: {{ template "argo-tunnel.name" . }}-{{ .Values.controller.name }}
+        image: "{{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag }}"
+        imagePullPolicy: "{{ .Values.controller.image.pullPolicy }}"
+        command: ["/argot"]
+        args:
+        - --v={{ .Values.controller.logLevel }}
+        - --ingressClass={{ .Values.controller.ingressClass }}
+        - --namespace=$(POD_NAMESPACE)
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      {{- if or .Values.serviceAccount.create .Values.rbac.create }}
+      serviceAccount: {{ template "argo-tunnel.serviceAccountName" . }}
+      serviceAccountName: {{ template "argo-tunnel.serviceAccountName" . }}
+      {{- end }}
+      terminationGracePeriodSeconds: 30
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: {{ template "argo-tunnel.name" . }}
+                  component: {{ .Values.controller.name }}
+                  release: {{ .Release.Name }}
+              topologyKey: kubernetes.io/hostname

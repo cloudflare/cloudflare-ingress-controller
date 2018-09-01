@@ -54,7 +54,7 @@ Parameter | Description | Default
 `controller.replicaCount` | desired number of controller pods | `1`
 `loadBalancing.enabled` | if `true`, replicaCount may be >1, requires load balancing enabled on account | `false`
 `rbac.create` | if `true`, create & use RBAC resources | `true`
-`serviceAccount.create` | if `true`, create a service account | ``
+`serviceAccount.create` | if `true`, create a service account | `true`
 `serviceAccount.name` | The name of the service account to use. If not set and `create` is `true`, a name is generated using the fullname template. | ``
 
 A useful trick to debug issues with ingress is to increase the logLevel.

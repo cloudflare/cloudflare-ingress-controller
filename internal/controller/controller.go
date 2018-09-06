@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudflare/cloudflare-ingress-controller/pkg/tunnel"
+	"github.com/cloudflare/cloudflare-ingress-controller/internal/tunnel"
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"k8s.io/api/core/v1"

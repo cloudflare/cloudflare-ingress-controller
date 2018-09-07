@@ -8,7 +8,7 @@ COPY Gopkg.toml Gopkg.lock ./
 RUN dep ensure -v -vendor-only
 
 COPY cmd cmd
-COPY pkg pkg
+COPY internal internal
 RUN GO_EXTLINK_ENABLED=0 CGO_ENABLED=0 GOOS=linux go build \
     -o /go/bin/argot \
     -ldflags="-w -extldflags -s -X version.VERSION=${VERSION}" \

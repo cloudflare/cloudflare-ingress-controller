@@ -1,6 +1,14 @@
-.container-*
-.dockerfile*
-.push-*
-.go
+*.swp
+*.swo
 bin/
-vendor
+.build/
+vendor/
+.vs/
+.vscode/
+.idea/
+
+# MacOS
+.DS_Store
+.AppleDouble
+.LSOverride
+.Trashes

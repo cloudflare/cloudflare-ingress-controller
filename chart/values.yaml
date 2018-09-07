@@ -2,7 +2,7 @@
 controller:
   name: controller
   image:
-    repository: gcr.io/stackpoint-public/argot
+    repository: gcr.io/cloudflare-registry/argo-tunnel
     tag: "0.5.2"
     pullPolicy: Always
   ingressClass: argo-tunnel

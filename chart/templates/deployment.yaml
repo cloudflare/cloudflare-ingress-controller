@@ -34,7 +34,7 @@ spec:
       - name: {{ template "argo-tunnel.name" . }}-{{ .Values.controller.name }}
         image: "{{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag }}"
         imagePullPolicy: "{{ .Values.controller.image.pullPolicy }}"
-        command: ["/argot"]
+        command: ["argot"]
         args:
         - --v={{ .Values.controller.logLevel }}
         - --ingressClass={{ .Values.controller.ingressClass }}

@@ -317,7 +317,7 @@ func (argo *ArgoController) isWatchedEndpoint(ep *v1.Endpoints) bool {
 	return false
 }
 
-func (argo *ArgoController) Run(stopCh chan struct{}) {
+func (argo *ArgoController) Run(stopCh <-chan struct{}) {
 	defer argo.ingressWorkqueue.ShutDown()
 	defer argo.serviceWorkqueue.ShutDown()
 

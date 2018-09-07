@@ -1,13 +1,14 @@
 package main
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/cloudflare/cloudflare-ingress-controller/internal/controller"
 	"github.com/golang/glog"
+	"github.com/oklog/run"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -39,22 +40,39 @@ func main() {
 		glog.Fatalf("Failed to create kubernetes client: %v", err)
 	}
 
-	argo := controller.NewArgoController(kclient, config)
-	argo.EnableMetrics()
+	var g run.Group
+	{
+		ctx, cancel := context.WithCancel(context.Background())
+		sig := make(chan os.Signal, 1)
+		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
-	stopCh := make(chan struct{})
-	// defer close(stopCh)
+		g.Add(func() error {
+			select {
+			case s := <-sig:
+				glog.Infof("Received signal=%s, exiting gracefully...\n", s.String())
+				cancel()
+			case <-ctx.Done():
+			}
+			return ctx.Err()
+		}, func(_ error) {
+			cancel()
+		})
+	}
+	{
+		ctx, cancel := context.WithCancel(context.Background())
+		argo := controller.NewArgoController(kclient, config)
+		argo.EnableMetrics()
 
-	// crude trap Ctrl^C for better cleanup in testing
-	c := make(chan os.Signal, 2)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-c
-		close(stopCh)
-		time.Sleep(10 * time.Second)
+		g.Add(func() error {
+			argo.Run(ctx.Done())
+			return nil
+		}, func(error) {
+			cancel()
+		})
+	}
+
+	if err := g.Run(); err != nil {
+		glog.Errorf("Received error, err=%v\n", err)
 		os.Exit(1)
-	}()
-
-	glog.Info("Starting Controller")
-	argo.Run(stopCh)
+	}
 }

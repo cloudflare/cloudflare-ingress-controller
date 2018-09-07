@@ -18,7 +18,7 @@ spec:
       app: {{ template "argo-tunnel.name" . }}
       component: {{ .Values.controller.name }}
       release: {{ .Release.Name }}
-strategy:
+  strategy:
     rollingUpdate:
       maxSurge: 1
       maxUnavailable: 1

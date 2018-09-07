@@ -11,7 +11,7 @@ COPY cmd cmd
 COPY internal internal
 RUN GO_EXTLINK_ENABLED=0 CGO_ENABLED=0 GOOS=linux go build \
     -o /go/bin/argot \
-    -ldflags="-w -extldflags -s -X version.VERSION=${VERSION}" \
+    -ldflags="-w -extldflags -s -X github.com/cloudflare/cloudflare-ingress-controller/internal/version.VERSION=${VERSION}" \
     -v github.com/cloudflare/cloudflare-ingress-controller/cmd/argot
 
 FROM alpine:3.8 AS final

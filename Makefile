@@ -23,8 +23,8 @@ PUSHES := $(addprefix push-, $(PLATFORMS))
 JOBS := $(addprefix job-, $(PLATFORMS))
 MANIFESTS =
 
-SRCS := $(shell go list ./cmd/... ./pkg/...)
-SRC_DIRS := ./cmd ./pkg
+SRCS := $(shell go list ./cmd/... ./internal/...)
+SRC_DIRS := ./cmd ./internal
 TMP_DIR := .build
 
 VERSION ?= $(shell git describe --tags --always --dirty)
@@ -39,7 +39,6 @@ build-dir:
 
 .PHONY: check
 check: test vet fmt staticcheck unused misspell
-	@echo checking code ...
 
 .PHONY: clean
 clean:
@@ -107,7 +106,7 @@ misspell:
 		-i clas \
 		-locale US \
 		-error \
-		cmd/* pkg/* docs/* chart/*.md *.md
+		cmd/* internal/* docs/* chart/*.md *.md
 
 .PHONY: push
 push: container
@@ -126,6 +125,7 @@ staticcheck:
 
 .PHONY: test
 test: install
+	@echo testing code for issues
 	@go test ./...
 
 .PHONY: test-race

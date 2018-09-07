@@ -4,8 +4,8 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/cloudflare/cloudflare-ingress-controller/pkg/controller"
-	"github.com/cloudflare/cloudflare-ingress-controller/pkg/version"
+	"github.com/cloudflare/cloudflare-ingress-controller/internal/controller"
+	"github.com/cloudflare/cloudflare-ingress-controller/internal/version"
 )
 
 func parseFlags() (*controller.Config, bool, error) {

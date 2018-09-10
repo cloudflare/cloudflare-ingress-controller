@@ -51,10 +51,9 @@ type ArgoController struct {
 }
 
 type Config struct {
-	IngressClass   string
-	KubeconfigPath string
-	Namespace      string
-	MaxRetries     int
+	IngressClass string
+	Namespace    string
+	MaxRetries   int
 }
 
 func NewArgoController(client kubernetes.Interface, config *Config) *ArgoController {

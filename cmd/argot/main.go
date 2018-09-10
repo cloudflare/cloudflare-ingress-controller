@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/cloudflare/cloudflare-ingress-controller/internal/controller"
+	"github.com/cloudflare/cloudflare-ingress-controller/internal/version"
 	"github.com/golang/glog"
 	"github.com/oklog/run"
 	"k8s.io/client-go/kubernetes"
@@ -16,26 +19,24 @@ import (
 
 func main() {
 
-	config, exitNow, _ := parseFlags()
+	kubeconfig := flag.String("kubeconfig", "", "Path to a kubeconfig file")
+	printVersion := flag.Bool("version", false, "prints application version")
 
-	if exitNow {
+	config := &controller.Config{
+		MaxRetries: controller.MaxRetries,
+	}
+	flag.StringVar(&config.Namespace, "namespace", "default", "Namespace to run in")
+	flag.StringVar(&config.IngressClass, "ingressClass", controller.CloudflareArgoIngressType, "Name of ingress class, used in ingress annotation")
+
+	flag.Set("logtostderr", "true")
+	flag.Parse()
+
+	if *printVersion {
+		fmt.Printf("%s %s\n", version.APP_NAME, version.VERSION)
 		os.Exit(0)
 	}
 
-	var kclient *kubernetes.Clientset
-	var kconfig *rest.Config
-	var err error
-
-	if config.KubeconfigPath != "" {
-		kconfig, err = clientcmd.BuildConfigFromFlags("", config.KubeconfigPath)
-	} else {
-		kconfig, err = rest.InClusterConfig()
-	}
-	if err != nil {
-		glog.Fatalf("Failed to get config: %v", err)
-	}
-
-	kclient, err = kubernetes.NewForConfig(kconfig)
+	kclient, err := kubeclient(*kubeconfig)
 	if err != nil {
 		glog.Fatalf("Failed to create kubernetes client: %v", err)
 	}
@@ -75,4 +76,18 @@ func main() {
 		glog.Errorf("Received error, err=%v\n", err)
 		os.Exit(1)
 	}
+}
+
+func kubeclient(kubeconfigpath string) (*kubernetes.Clientset, error) {
+	kubeconfig, err := func() (*rest.Config, error) {
+		if kubeconfigpath != "" {
+			return clientcmd.BuildConfigFromFlags("", kubeconfigpath)
+		}
+		return rest.InClusterConfig()
+	}()
+
+	if err != nil {
+		return nil, err
+	}
+	return kubernetes.NewForConfig(kubeconfig)
 }

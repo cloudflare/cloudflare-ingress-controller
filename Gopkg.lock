@@ -42,12 +42,10 @@
   revision = "18c9f6c67e3dfc12e0ddaca748d2887f97a7ac28"
 
 [[projects]]
-  digest = "1:0112617fd2325e376e35ee2032ded29446cc77884f413ba912de41143dc10363"
+  digest = "1:78e19461a3d2c82498255cae34adfa41336f4b6989e62e201b8cd37d2c7b6f3d"
   name = "github.com/cloudflare/cloudflared"
   packages = [
     "h2mux",
-    "log",
-    "metallog",
     "metrics",
     "origin",
     "tunnelrpc",
@@ -56,7 +54,7 @@
     "websocket",
   ]
   pruneopts = ""
-  revision = "5e7151649a6d8f6f07a3b6137b00054feeea7a49"
+  revision = "2a7b6c1d0268ea56f85a50e866acfab6e5dd3cdd"
   source = "https://github.com/StackPointCloud/cloudflared.git"
 
 [[projects]]
@@ -270,22 +268,6 @@
   revision = "8b799c424f57fa123fc63a99d6383bc6e4c02578"
 
 [[projects]]
-  digest = "1:9ea83adf8e96d6304f394d40436f2eb44c1dc3250d223b74088cc253a6cd0a1c"
-  name = "github.com/mattn/go-colorable"
-  packages = ["."]
-  pruneopts = ""
-  revision = "167de6bfdfba052fa6b2d3664c8f5272e23c9072"
-  version = "v0.0.9"
-
-[[projects]]
-  digest = "1:78229b46ddb7434f881390029bd1af7661294af31f6802e0e1bedaad4ab0af3c"
-  name = "github.com/mattn/go-isatty"
-  packages = ["."]
-  pruneopts = ""
-  revision = "0360b2af4f38e8d38c7fce2a9f4e702702d73a39"
-  version = "v0.0.3"
-
-[[projects]]
   digest = "1:4c23ced97a470b17d9ffd788310502a077b9c1f60221a85563e49696276b4147"
   name = "github.com/matttproud/golang_protobuf_extensions"
   packages = ["pbutil"]
@@ -342,15 +324,15 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:4142d94383572e74b42352273652c62afec5b23f325222ed09198f46009022d1"
+  digest = "1:2f69dc6b2685b31a1a410ef697410aa8a669704fb201d45dbd8c1911728afa75"
   name = "github.com/prometheus/client_golang"
   packages = [
     "prometheus",
     "prometheus/promhttp",
   ]
   pruneopts = ""
-  revision = "c5b7fccd204277076155f10851dad72b76a49317"
-  version = "v0.8.0"
+  revision = "967789050ba94deca04a5e84cce8ad472ce313c1"
+  version = "v0.9.0-pre1"
 
 [[projects]]
   branch = "master"
@@ -699,6 +681,7 @@
   ]
   pruneopts = ""
   revision = "243bfedb776812540b7e2fb8d4e5c19814ab1ed8"
+  source = "https://github.com/zombiezen/go-capnproto2"
   version = "v2.17.0"
 
 [solve-meta]

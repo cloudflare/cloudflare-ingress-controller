@@ -1,16 +1,17 @@
 package main
 
 import (
+	"context"
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
-	"github.com/cloudflare/cloudflare-ingress-controller/pkg/controller"
-	"github.com/cloudflare/cloudflare-ingress-controller/pkg/tunnel"
+	"github.com/cloudflare/cloudflare-ingress-controller/internal/controller"
+	"github.com/cloudflare/cloudflare-ingress-controller/internal/version"
 	"github.com/golang/glog"
-	log "github.com/sirupsen/logrus"
+	"github.com/oklog/run"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -30,51 +31,80 @@ func init() {
 
 func main() {
 
-	config, exitNow, _ := parseFlags()
+	kubeconfig := flag.String("kubeconfig", "", "Path to a kubeconfig file")
+	printVersion := flag.Bool("version", false, "prints application version")
 
-	if exitNow {
+	config := &controller.Config{
+		MaxRetries: controller.MaxRetries,
+	}
+	flag.StringVar(&config.Namespace, "namespace", "default", "Namespace to run in")
+	flag.StringVar(&config.IngressClass, "ingressClass", controller.CloudflareArgoIngressType, "Name of ingress class, used in ingress annotation")
+
+	flag.Set("logtostderr", "true")
+	flag.Parse()
+
+	if *printVersion {
+		fmt.Printf("%s %s\n", version.APP_NAME, version.VERSION)
 		os.Exit(0)
 	}
 
-	var kclient *kubernetes.Clientset
-	var kconfig *rest.Config
-	var err error
-
-	if config.KubeconfigPath != "" {
-		kconfig, err = clientcmd.BuildConfigFromFlags("", config.KubeconfigPath)
-	} else {
-		kconfig, err = rest.InClusterConfig()
-	}
-	if err != nil {
-		glog.Fatalf("Failed to get config: %v", err)
-	}
-
-	kclient, err = kubernetes.NewForConfig(kconfig)
+	kclient, err := kubeclient(*kubeconfig)
 	if err != nil {
 		glog.Fatalf("Failed to create kubernetes client: %v", err)
 	}
 
-	argo := controller.NewArgoController(kclient, config)
-	argo.EnableMetrics()
+	var g run.Group
+	{
+		ctx, cancel := context.WithCancel(context.Background())
+		sig := make(chan os.Signal, 1)
+		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
-	stopCh := make(chan struct{})
-	// defer close(stopCh)
+		g.Add(func() error {
+			select {
+			case s := <-sig:
+				glog.Infof("Received signal=%s, exiting gracefully...\n", s.String())
+				cancel()
+			case <-ctx.Done():
+			}
+			return ctx.Err()
+		}, func(_ error) {
+			cancel()
+		})
+	}
+	{
+		ctx, cancel := context.WithCancel(context.Background())
+		argo := controller.NewArgoController(kclient, config)
+		argo.EnableMetrics()
+
+		g.Add(func() error {
+			argo.Run(ctx.Done())
+			return nil
+		}, func(error) {
+			cancel()
+		})
+	}
 
 	logger := log.New()
 	go func() {
 		tunnel.ServeMetrics(9090, stopCh, logger)
 	}()
 
-	// crude trap Ctrl^C for better cleanup in testing
-	c := make(chan os.Signal, 2)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-c
-		close(stopCh)
-		time.Sleep(10 * time.Second)
+	if err := g.Run(); err != nil {
+		glog.Errorf("Received error, err=%v\n", err)
 		os.Exit(1)
+	}
+}
+
+func kubeclient(kubeconfigpath string) (*kubernetes.Clientset, error) {
+	kubeconfig, err := func() (*rest.Config, error) {
+		if kubeconfigpath != "" {
+			return clientcmd.BuildConfigFromFlags("", kubeconfigpath)
+		}
+		return rest.InClusterConfig()
 	}()
 
-	glog.Info("Starting Controller")
-	argo.Run(stopCh)
+	if err != nil {
+		return nil, err
+	}
+	return kubernetes.NewForConfig(kubeconfig)
 }

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudflare/cloudflare-ingress-controller/pkg/tunnel"
+	"github.com/cloudflare/cloudflare-ingress-controller/internal/tunnel"
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"k8s.io/api/core/v1"
@@ -51,10 +51,9 @@ type ArgoController struct {
 }
 
 type Config struct {
-	IngressClass   string
-	KubeconfigPath string
-	Namespace      string
-	MaxRetries     int
+	IngressClass string
+	Namespace    string
+	MaxRetries   int
 }
 
 func NewArgoController(client kubernetes.Interface, config *Config) *ArgoController {
@@ -317,7 +316,7 @@ func (argo *ArgoController) isWatchedEndpoint(ep *v1.Endpoints) bool {
 	return false
 }
 
-func (argo *ArgoController) Run(stopCh chan struct{}) {
+func (argo *ArgoController) Run(stopCh <-chan struct{}) {
 	defer argo.ingressWorkqueue.ShutDown()
 	defer argo.serviceWorkqueue.ShutDown()
 

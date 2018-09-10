@@ -292,6 +292,14 @@
   version = "1.0.0"
 
 [[projects]]
+  digest = "1:94e9081cc450d2cdf4e6886fc2c06c07272f86477df2d74ee5931951fa3d2577"
+  name = "github.com/oklog/run"
+  packages = ["."]
+  pruneopts = ""
+  revision = "4dadeb3030eda0273a12382bb2348ffc7c9d1a39"
+  version = "v1.0.0"
+
+[[projects]]
   branch = "master"
   digest = "1:c24598ffeadd2762552269271b3b1510df2d83ee6696c1e543a0ff653af494bc"
   name = "github.com/petar/GoLLRB"
@@ -692,6 +700,7 @@
     "github.com/cloudflare/cloudflared/origin",
     "github.com/cloudflare/cloudflared/tunnelrpc/pogs",
     "github.com/golang/glog",
+    "github.com/oklog/run",
     "github.com/pkg/errors",
     "github.com/sirupsen/logrus",
     "github.com/stretchr/testify/assert",

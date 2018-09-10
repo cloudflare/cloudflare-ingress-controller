@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cloudflare/cloudflare-ingress-controller/pkg/cloudflare"
-	"github.com/cloudflare/cloudflare-ingress-controller/pkg/version"
+	"github.com/cloudflare/cloudflare-ingress-controller/internal/cloudflare"
+	"github.com/cloudflare/cloudflare-ingress-controller/internal/version"
 	"github.com/cloudflare/cloudflared/origin"
 	tunnelpogs "github.com/cloudflare/cloudflared/tunnelrpc/pogs"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"

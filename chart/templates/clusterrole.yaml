@@ -1,8 +1,13 @@
-{{ if .Values.rbac.install }}
+{{- if .Values.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name:  {{ .Values.rbac.roleName }}
+  labels:
+    app: {{ template "argo-tunnel.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+  name: {{ template "argo-tunnel.roleName" . }}
 rules:
 - apiGroups:
   - ""
@@ -22,4 +27,4 @@ rules:
   verbs:
   - get
   - update
-{{ end }}
+{{- end }}

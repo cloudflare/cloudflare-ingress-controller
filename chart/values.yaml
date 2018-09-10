@@ -1,47 +1,24 @@
-# Default values for cloudflare-argo-ingress.
+# Default values for cloudflare argo-tunnel ingress.
+controller:
+  name: controller
+  image:
+    repository: gcr.io/cloudflare-registry/argo-tunnel
+    tag: "0.5.2"
+    pullPolicy: Always
+  ingressClass: argo-tunnel
+  logLevel: 2
+  replicaCount: 1
 
-# replicaCount is used only when cloudflare loadbalancing is enabled
-replicaCount: 1
-
-image:
-  repository: gcr.io/stackpoint-public/argot
-  tag: 0.5.2
-  pullPolicy: IfNotPresent
-
-## configure the ingressClass value in order to manage different ingress-controller 
-## deployments each for a different set of ingresses
-## if not set, defaults to the value "argo-tunnel"
-# handledIngressClass: argo-tunnel-custom-value
-
-resources:
-  limits:
-    cpu: 100m
-    memory: 128Mi
-  requests:
-    cpu: 100m
-    memory: 128Mi
-
-rbac:
-  install: true
-  serviceAccount: cloudflare-argo
-  roleName: cloudflare-argo
-
-# Application logging level, higher values give more verbose output
-logging:
-  level: 2
-
-## Cloudflare account details
-
-# The secret contains the base64-encoded origin certificate for your cloudflare domain.
-# Set the install flag false to configure manually in the cluster later.
-# See https://developers.cloudflare.com/argo-tunnel/quickstart/quickstart/ for information on
-# obtaining the origin certificate
-secret:
-  install: false
-  domain: example.co
-  certificate_b64: LS0tLS1CRUdJT...insert base64-encoded certificate here
-
-# Loadbalancing support depends upon the cloudflare account settings
-loadbalancing:
+# Enable load balancing
+# requires load balancing enabled on the cloudflare account.
+loadBalancing:
   enabled: false
 
+# Enable rbac
+rbac:
+  create: true
+  name:
+
+serviceAccount:
+  create: true
+  name:

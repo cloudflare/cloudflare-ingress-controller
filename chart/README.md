@@ -1,57 +1,69 @@
-# Cloudflare Argo Tunnel ingress controller Helm chart
+# Argo Tunnel Ingress Controller
 
-## Cloudflare Argo Tunnel
-
-The Cloudflare Argo Tunnel Ingress Controller makes connections between a Kubernetes
-service and the Cloudflare edge, exposing an application in your cluster to the
-internet at a hostname of your choice. A quick description of the details can be
-found at https://developers.cloudflare.com/argo-tunnel/quickstart/ and
-https://github.com/cloudflare/cloudflare-ingress-controller.
-
-**Note:** Before installing Cloudflare Argo Tunnel you need to obtain Cloudflare
-credentials for your domain zone. The credentials are obtained wtih use of the cloudflared
-application, available from https://developers.cloudflare.com/argo-tunnel/downloads/
-
-
-To deploy Cloudflare Argo Tunnel Ingress Controller:
-
+### TL;DR;
+```console
+$ helm install --name argo-mydomain chart/
 ```
-### set these variables to match your situation
-DOMAIN=mydomain.com
+> **Tip**: See [Your First Tunnel][guide-first-tunnel].
 
-CERT_FILE=$HOME/.cloudflared/cert.pem
-CERT_B64=$(base64 $CERT_FILE)
+### About
+Argo Tunnel Ingress Controller provides Kubernetes Ingress via Argo Tunnels.
+The controller establishes or destroys tunnels by monitoring changes to resources.
 
-NS="argo"
-USE_RBAC=true
-###
+Argo Tunnel offers an easy way to expose web servers securely to the internet,
+without opening up firewall ports and configuring ACLs. Argo Tunnel also ensures
+requests route through Cloudflare before reaching the web server so you can be 
+sure attack traffic is stopped with Cloudflare’s WAF and Unmetered DDoS mitigation
+and authenticated with Access if you’ve enabled those features for your account.
 
-RELEASE_NAME="argo-$DOMAIN"
+- [Argo Smart Routing][argo-smart-routing]
+- [Argo Tunnel: Reference][argo-tunnel-reference]
+- [Argo Tunnel: Quick Start][argo-tunnel-quick-start]
+- [Argo Tunnel Ingress: Quick Start][argo-tunnel-ingress-quick-start]
 
-helm install --name $RELEASE_NAME --namespace $NS \
-   --set rbac.install=$USE_RBAC \
-   --set secret.install=true,secret.domain=$DOMAIN,secret.certificate_b64=$CERT_B64 \
-   chart/
+### Installing the Chart
+To install the chart with the release name `argo-mydomain`:
+```console
+$ helm install --name argo-mydomain chart/
 ```
+> **Tip**: See [Your First Tunnel][guide-first-tunnel].
 
+The command deploys the controller on the Kubernetes cluster in the default configuration.
+The [configuration](#configuration) section lists the parameters that can be configured
+during installation.
 
-Check that pods are running:
+> **Tip**: List all releases using `helm list`
 
-```bash
-kubectl -n argo get pods
-NAME                                                    READY     STATUS    RESTARTS   AGE
-cloudflare-argo-ingress-cloudflare-argo-ingress-3061065498-v6mw5   1/1       Running   0          1m
+### Uninstalling the Chart
+To uninstall/delete the `argo-mydomain` deployment:
+```console
+$ helm delete argo-mydomain
 ```
 
-## Testing external access
+### Configuration
+The following table lists the configurable parameters of the chart and their default values.
 
-Now you should be able to check argo at https://argo.mydomain.com/
-And if you noticed Cloudflare Argo Tunnel creates `https` connection by default :-)
+Parameter | Description | Default
+--- | --- | ---
+`controller.name` | name of the controller component | `controller`
+`controller.image.repository` | controller container image repository | `gcr.io/stackpoint-public/argot`
+`controller.image.tag` | controller container image tag | `0.5.2`
+`controller.image.pullPolicy` | controller container image pull policy | `Always`
+`controller.ingressClass` | name of the ingress class to route through this controller | `argo-tunnel`
+`controller.logLevel` | log-level for this controller | `2`
+`controller.replicaCount` | desired number of controller pods | `1`
+`loadBalancing.enabled` | if `true`, replicaCount may be >1, requires load balancing enabled on account | `false`
+`rbac.create` | if `true`, create & use RBAC resources | `true`
+`serviceAccount.create` | if `true`, create a service account | `true`
+`serviceAccount.name` | The name of the service account to use. If not set and `create` is `true`, a name is generated using the fullname template. | ``
 
-## Remove
-
-The release can be cleaned up with helm:
-
-```bash
-helm delete --purge  $RELEASE_NAME
+A useful trick to debug issues with ingress is to increase the logLevel.
+```console
+$ helm install chart/ --set controller.logLevel=6
 ```
+
+[argo-smart-routing]: https://www.cloudflare.com/products/argo-smart-routing/
+[argo-tunnel-reference]: https://developers.cloudflare.com/argo-tunnel/reference/
+[argo-tunnel-quick-start]: https://developers.cloudflare.com/argo-tunnel/quickstart/
+[argo-tunnel-ingress-quick-start]: https://github.com/cloudflare/cloudflare-ingress-controller/
+[guide-first-tunnel]: ../docs/guide_first_tunnel.md

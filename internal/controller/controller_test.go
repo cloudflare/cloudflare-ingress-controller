@@ -21,10 +21,9 @@ import (
 )
 
 var TestConfig = &Config{
-	IngressClass:   CloudflareArgoIngressType,
-	KubeconfigPath: "",
-	Namespace:      "cloudflare",
-	MaxRetries:     MaxRetries,
+	IngressClass: CloudflareArgoIngressType,
+	Namespace:    "cloudflare",
+	MaxRetries:   MaxRetries,
 }
 
 func init() {

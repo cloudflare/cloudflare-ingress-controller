@@ -1,8 +1,20 @@
-.container-*
-.dockerfile*
-.push-*
-.go
+*.swp
+*.swo
 bin/
+<<<<<<< HEAD
 vendor
 .cache
 .vscode
+=======
+.build/
+vendor/
+.vs/
+.vscode/
+.idea/
+
+# MacOS
+.DS_Store
+.AppleDouble
+.LSOverride
+.Trashes
+>>>>>>> master

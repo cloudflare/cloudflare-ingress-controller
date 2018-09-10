@@ -1,208 +1,148 @@
+#PROJECT = cloudflare-ingress-controller
+PROJECT = argo-tunnel
+REGISTRY ?= gcr.io/cloudflare-registry
+IMAGE := $(REGISTRY)/$(PROJECT)
 
-# The binary to build (just the basename).
-BIN := argot
+PLATFORMS := \
+	amd64-linux-amd64 \
+	arm64v8-linux-arm64 \
+	ppc64le-linux-ppc64le
+	# ARM, consider supporting 32bit
+	# arm32v6-linux-arm-5
+	# arm32v6-linux-arm-6
+	# arm32v6-linux-arm-7
+	# x86, consider supporting 32bit
+	# i386-lunix-386
+	# QEMU issue, exec failure on apk add
+	# s390x-linux-s390x
 
-# This repo's root import path (under GOPATH).
-PKG := github.com/cloudflare/cloudflare-ingress-controller
+COMMA := ,
+CONTAINERS := $(addprefix container-, $(PLATFORMS))
+CONTAINER_ARGS = s/ARG_VERSION/$(1)/g;s/ARG_ROOT/$(2)/g;s/ARG_OS/$(3)/g;s/ARG_ARCH/$(4)/g;s/ARG_ARM/$(5)/g
+PUSHES := $(addprefix push-, $(PLATFORMS))
+JOBS := $(addprefix job-, $(PLATFORMS))
+MANIFESTS =
 
-# Where to push the docker image.
-REGISTRY ?= gcr.io/stackpoint-public
+SRCS := $(shell go list ./cmd/... ./internal/...)
+SRC_DIRS := ./cmd ./internal
+TMP_DIR := .build
 
-# Which architecture to build - see $(ALL_ARCH) for options.
-ARCH ?= amd64
-
-# This version-strategy if not set externally
-# use git tags to set the version string
 VERSION ?= $(shell git describe --tags --always --dirty)
-# use a manual value to set the version string
-#VERSION := 1.2.3
 
-###
-### These variables should not need tweaking.
-###
-SRC_DIRS := ./cmd ./pkg # directories which hold app source (not vendored)
-SRC_FILES := $(shell go list ./cmd/... ./pkg/...)
+.PHONY: default
+default: clean;
 
-ALL_ARCH := amd64 arm arm64 ppc64le
+.PHONY: build-dir
+build-dir:
+	@echo generating build directory
+	@mkdir -p $(TMP_DIR)
 
-# Set default base image dynamically for each arch
-ifeq ($(ARCH),amd64)
-    BASEIMAGE?=alpine
-endif
-ifeq ($(ARCH),arm)
-    BASEIMAGE?=armel/busybox
-endif
-ifeq ($(ARCH),arm64)
-    BASEIMAGE?=aarch64/busybox
-endif
-ifeq ($(ARCH),ppc64le)
-    BASEIMAGE?=ppc64le/busybox
-endif
+.PHONY: check
+check: test vet fmt staticcheck unused misspell
 
-IMAGE := $(REGISTRY)/$(BIN)
+.PHONY: clean
+clean:
+	@echo cleaning build targets
+	@rm -rf bin .build
 
-BUILD_IMAGE ?= golang:1.10-alpine
+.PHONY: container
+container:
+	@echo build docker container
+	@docker build --build-arg VERSION=$(VERSION) -t $(IMAGE):$(VERSION) .
 
-# If you want to build all binaries, see the 'all-build' rule.
-# If you want to build all containers, see the 'all-container' rule.
-# If you want to build AND push all containers, see the 'all-push' rule.
-all: build
+.PHONY: cross $(CONTAINERS) $(PUSHES) $(JOBS)
+cross: $(JOBS)
+	@echo building multi-arch manifest
+	@docker manifest create --amend $(IMAGE):$(VERSION) $(MANIFESTS)
+	@docker manifest push $(IMAGE):$(VERSION)
 
-build-%:
-	@$(MAKE) --no-print-directory ARCH=$* build
+$(CONTAINERS): container-%: build-dir
+	@echo build docker container $*
+	$(eval $@_ARGS := $$(call CONTAINER_ARGS,$(VERSION),$(subst -,$(COMMA),$*)))
+	$(eval $@_ARCH := $$(firstword $(subst -, ,$*)))
+	@sed -e "$($@_ARGS)" hack/Dockerfile > $(TMP_DIR)/Dockerfile.$*
+	@docker build -t $(IMAGE)-$($@_ARCH):$(VERSION) -f $(TMP_DIR)/Dockerfile.$* .
 
-container-%:
-	@$(MAKE) --no-print-directory ARCH=$* container
+$(PUSHES): push-%: container-%
+	@echo push docker container $*
+	$(eval $@_ARCH := $$(firstword $(subst -, ,$*)))
+	@docker push $(IMAGE)-$($@_ARCH):$(VERSION)
 
-push-%:
-	@$(MAKE) --no-print-directory ARCH=$* push
+$(JOBS): job-%: push-%
+	$(eval $@_ARCH := $$(firstword $(subst -, ,$*)))
+	$(eval MANIFESTS += $(IMAGE)-$($@_ARCH):$(VERSION))
 
-all-build: $(addprefix build-, $(ALL_ARCH))
+.PHONY: dep
+dep:
+	@echo ensure dependencies
+	@dep ensure -vendor-only -v
 
-all-container: $(addprefix container-, $(ALL_ARCH))
-
-all-push: $(addprefix push-, $(ALL_ARCH))
-
-build: bin/$(ARCH)/$(BIN)
-
-bin/$(ARCH)/$(BIN): build-dirs
-	@echo "building: $@"
-	@echo docker run                                                        \
-	    -ti                                                                 \
-	    --rm                                                                \
-	    -e GOCACHE=/go/src/$(PKG)/.cache                                    \
-	    -v "$$(pwd)/.go:/go"                                                \
-	    -v "$$(pwd):/go/src/$(PKG)"                                         \
-	    -v "$$(pwd)/bin/$(ARCH):/go/bin"                                    \
-	    -v "$$(pwd)/bin/$(ARCH):/go/bin/$$(go env GOOS)_$(ARCH)"            \
-	    -v "$$(pwd)/.go/std/$(ARCH):/usr/local/go/pkg/linux_$(ARCH)_static" \
-	    -w /go/src/$(PKG)                                                   \
-	    $(BUILD_IMAGE)                                                      \
-	    /bin/sh -c "                                                        \
-	        ARCH=$(ARCH)                                                    \
-	        VERSION=$(VERSION)                                              \
-	        PKG=$(PKG)                                                      \
-	        BIN=$(BIN)                                                      \
-	        ./build/build.sh                                                \
-	    "
-	@docker run                                                             \
-	    -ti                                                                 \
-	    --rm                                                                \
-	    -e GOCACHE=/go/src/$(PKG)/.cache                                    \
-	    -v "$$(pwd)/.go:/go"                                                \
-	    -v "$$(pwd):/go/src/$(PKG)"                                         \
-	    -v "$$(pwd)/bin/$(ARCH):/go/bin"                                    \
-	    -v "$$(pwd)/bin/$(ARCH):/go/bin/$$(go env GOOS)_$(ARCH)"            \
-	    -v "$$(pwd)/.go/std/$(ARCH):/usr/local/go/pkg/linux_$(ARCH)_static" \
-	    -w /go/src/$(PKG)                                                   \
-	    $(BUILD_IMAGE)                                                      \
-	    /bin/sh -c "                                                        \
-	        ARCH=$(ARCH)                                                    \
-	        VERSION=$(VERSION)                                              \
-	        PKG=$(PKG)                                                      \
-	        BIN=$(BIN)                                                      \
-	        ./build/build.sh                                                \
-	    "
-
-# Example: make shell CMD="-c 'date > datefile'"
-shell: build-dirs
-	@echo "launching a shell in the containerized build environment"
-	@docker run                                                             \
-	    -ti                                                                 \
-	    --rm                                                                \
-	    -v "$$(pwd)/.cache:/go/.cache"                                         \
-	    -v "$$(pwd)/.go:/go"                                                \
-	    -v "$$(pwd):/go/src/$(PKG)"                                         \
-	    -v "$$(pwd)/bin/$(ARCH):/go/bin"                                    \
-	    -v "$$(pwd)/bin/$(ARCH):/go/bin/$$(go env GOOS)_$(ARCH)"            \
-	    -v "$$(pwd)/.go/std/$(ARCH):/usr/local/go/pkg/linux_$(ARCH)_static" \
-	    -w /go/src/$(PKG)                                                   \
-	    $(BUILD_IMAGE)                                                      \
-	    /bin/sh $(CMD)
-
-DOTFILE_IMAGE = $(subst :,_,$(subst /,_,$(IMAGE))-$(VERSION))
-
-container: .container-$(DOTFILE_IMAGE) container-name
-.container-$(DOTFILE_IMAGE): bin/$(ARCH)/$(BIN) Dockerfile.in
-	@sed \
-	    -e 's|ARG_BIN|$(BIN)|g' \
-	    -e 's|ARG_ARCH|$(ARCH)|g' \
-	    -e 's|ARG_FROM|$(BASEIMAGE)|g' \
-	    Dockerfile.in > .dockerfile-$(ARCH)
-	@docker build -t $(IMAGE):$(VERSION) -f .dockerfile-$(ARCH) .
-	@docker images -q $(IMAGE):$(VERSION) > $@
-
-container-name:
-	@echo "container: $(IMAGE):$(VERSION)"
-
-push: .push-$(DOTFILE_IMAGE) push-name
-.push-$(DOTFILE_IMAGE): .container-$(DOTFILE_IMAGE)
-	@docker push $(IMAGE):$(VERSION)
-	@docker images -q $(IMAGE):$(VERSION) > $@
-
-push-name:
-	@echo "pushed: $(IMAGE):$(VERSION)"
-
-version:
-	@echo $(VERSION)
-
-test-safe: build-dirs
-	@docker run                                                             \
-	    -ti                                                                 \
-	    --rm                                                                \
-	    -v "$$(pwd)/.cache:/go/.cache"                                      \
-	    -v "$$(pwd)/.go:/go"                                                \
-	    -v "$$(pwd):/go/src/$(PKG)"                                         \
-	    -v "$$(pwd)/bin/$(ARCH):/go/bin"                                    \
-	    -v "$$(pwd)/.go/std/$(ARCH):/usr/local/go/pkg/linux_$(ARCH)_static" \
-	    -w /go/src/$(PKG)                                                   \
-	    $(BUILD_IMAGE)                                                      \
-	    /bin/sh -c "                                                        \
-	        ./build/test.sh $(SRC_DIRS)                                     \
-	    "
-
-build-dirs:
-	@mkdir -p bin/$(ARCH)
-	@mkdir -p .go/src/$(PKG) .go/pkg .go/bin .go/std/$(ARCH)
-
-clean: container-clean bin-clean
-
-container-clean:
-	rm -rf .container-* .dockerfile-* .push-*
-
-bin-clean:
-	rm -rf .go .cache bin
-
-check: test vet gofmt staticcheck unused misspell
-
-install:
-	go install -v ./...
-
-test: install
-	go test ./...
-
-test-race: | test
-	go test -race ./...
-
-vet: | test
-	go vet ./...
-
-gofmt:  
-	@echo Checking code is gofmted
+.PHONY: fmt
+fmt:  
+	@echo checking code is formatted
 	@test -z "$(shell gofmt -s -l -d -e $(SRC_DIRS) | tee /dev/stderr)"
 
-staticcheck:
-	@go get honnef.co/go/tools/cmd/staticcheck
-	staticcheck $(SRC_FILES)
+.PHONY: helm
+helm:
+	@echo generating helm manifest
+	@helm template --name=$(VERSION) chart/
 
-unused:
-	@go get honnef.co/go/tools/cmd/unused
-	unused -exported $(SRC_FILES)
+.PHONY: install
+install:
+	@echo installing build targets
+	@go install -v ./...
 
+.PHONY: lint
+lint:
+	@echo checking code is linted
+	@go get golang.org/x/lint/golint
+	@golint $(shell go list ./... | grep -v /vendor/)
+
+.PHONY: misspell
 misspell:
+	@echo checking for misspellings
 	@go get github.com/client9/misspell/cmd/misspell
-	misspell \
+	@misspell \
 		-i clas \
 		-locale US \
 		-error \
-		cmd/* pkg/* docs/* *.md
+		cmd/* internal/* docs/* chart/*.md *.md
+
+.PHONY: push
+push: container
+	@docker push $(IMAGE):$(VERSION)
+	@if git describe --tags --exact-match >/dev/null 2>&1; \
+	then \
+		docker tag $(IMAGE):$(VERSION) $(IMAGE):latest; \
+		docker push $(IMAGE):latest; \
+	fi
+
+.PHONY: staticcheck
+staticcheck:
+	@echo static checking code for issues
+	@go get honnef.co/go/tools/cmd/staticcheck
+	staticcheck $(SRCS)
+
+.PHONY: test
+test: install
+	@echo testing code for issues
+	@go test ./...
+
+.PHONY: test-race
+test-race: | test
+	@go test -race ./...
+
+.PHONY: unused
+unused:
+	@echo checking code for unused definitions
+	@go get honnef.co/go/tools/cmd/unused
+	unused -exported $(SRCS)
+
+.PHONY: version
+version:
+	@echo $(VERSION)
+
+.PHONY: vet
+vet: | test
+	@echo checking code is vetted
+	@go vet $(shell go list ./... | grep -v /vendor/)

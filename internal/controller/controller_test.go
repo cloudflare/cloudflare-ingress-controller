@@ -264,7 +264,7 @@ func getTunnelItems(namespace string) tunnelItems {
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name:        ingressName,
 			Namespace:   namespace,
-			Annotations: map[string]string{IngressAnnotationLBPool: poolName},
+			Annotations: map[string]string{annotationIngressLoadBalancer: poolName},
 		},
 		Spec: v1beta1.IngressSpec{
 			Rules: []v1beta1.IngressRule{
@@ -287,7 +287,7 @@ func getTunnelItems(namespace string) tunnelItems {
 			},
 		},
 	}
-	meta_v1.SetMetaDataAnnotation(&ingress.ObjectMeta, IngressClassKey, CloudflareArgoIngressType)
+	meta_v1.SetMetaDataAnnotation(&ingress.ObjectMeta, annotationIngressClass, CloudflareArgoIngressType)
 
 	service := v1.Service{
 		ObjectMeta: meta_v1.ObjectMeta{
@@ -322,11 +322,10 @@ func TestControllerLookups(t *testing.T) {
 
 	// broken for now
 	// assert.Equal(t, "fooservice", wc.getServiceNameForIngress(&items.Ingress))
-
+	lbpool, _ := parseIngressLoadBalancer(&items.Ingress)
 	assert.Equal(t, "test.example.com", wc.getHostNameForIngress(&items.Ingress))
 	assert.Equal(t, int32(80), wc.getServicePortForIngress(&items.Ingress).IntVal)
-
-	assert.Equal(t, "testpool", wc.getLBPoolForIngress(&items.Ingress))
+	assert.Equal(t, "testpool", lbpool)
 	// assert.Equal(t, "test.example.com", wc.getLBPoolForIngress(&items.Ingress))
 }
 

@@ -20,12 +20,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-var TestConfig = &Config{
-	IngressClass: CloudflareArgoIngressType,
-	Namespace:    "cloudflare",
-	MaxRetries:   MaxRetries,
-}
-
 func init() {
 	flag.Set("alsologtostderr", fmt.Sprintf("%t", true))
 	var logLevel string
@@ -233,7 +227,9 @@ func TestNewArgoController(t *testing.T) {
 	controllerNamespace := "cloudflare" // "cloudflare"
 	fakeClient := &fake.Clientset{}
 
-	wc := NewArgoController(fakeClient, TestConfig)
+	wc := NewArgoController(fakeClient,
+		SecretNamespace("cloudflare"),
+	)
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -241,7 +237,7 @@ func TestNewArgoController(t *testing.T) {
 	// wait for cache sync
 	time.Sleep(time.Second)
 
-	assert.Equal(t, wc.namespace, controllerNamespace)
+	assert.Equal(t, wc.options.secretNamespace, controllerNamespace)
 	assert.NotNil(t, wc.tunnels)
 	assert.Equal(t, 0, len(wc.tunnels))
 }
@@ -287,7 +283,7 @@ func getTunnelItems(namespace string) tunnelItems {
 			},
 		},
 	}
-	meta_v1.SetMetaDataAnnotation(&ingress.ObjectMeta, annotationIngressClass, CloudflareArgoIngressType)
+	meta_v1.SetMetaDataAnnotation(&ingress.ObjectMeta, annotationIngressClass, IngressClassDefault)
 
 	service := v1.Service{
 		ObjectMeta: meta_v1.ObjectMeta{
@@ -318,7 +314,9 @@ func TestControllerLookups(t *testing.T) {
 	serviceNamespace := "acme"
 	items := getTunnelItems(serviceNamespace)
 
-	wc := NewArgoController(fakeClient, TestConfig)
+	wc := NewArgoController(fakeClient,
+		SecretNamespace("cloudflare"),
+	)
 
 	// broken for now
 	// assert.Equal(t, "fooservice", wc.getServiceNameForIngress(&items.Ingress))
@@ -358,7 +356,9 @@ func TestTunnelInitialization(t *testing.T) {
 	fakeClient.Fake.AddWatchReactor("ingresses", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 	fakeClient.Fake.AddWatchReactor("ingresses", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 
-	wc := NewArgoController(fakeClient, TestConfig)
+	wc := NewArgoController(fakeClient,
+		SecretNamespace("cloudflare"),
+	)
 	// wc.EnableMetrics()cw
 
 	stopCh := make(chan struct{})
@@ -368,7 +368,7 @@ func TestTunnelInitialization(t *testing.T) {
 	// wait for cache sync
 	time.Sleep(time.Second)
 
-	assert.Equal(t, wc.namespace, controllerNamespace)
+	assert.Equal(t, wc.options.secretNamespace, controllerNamespace)
 	if wc.tunnels == nil {
 		t.Fatal("failing, tunnels is nil")
 	}
@@ -413,7 +413,9 @@ func TestTunnelServiceInitialization(t *testing.T) {
 
 	fakeClient.Fake.AddWatchReactor("*", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 
-	wc := NewArgoController(fakeClient, TestConfig)
+	wc := NewArgoController(fakeClient,
+		SecretNamespace("cloudflare"),
+	)
 	// wc.EnableMetrics()cw
 
 	stopCh := make(chan struct{})
@@ -436,7 +438,7 @@ func TestTunnelServiceInitialization(t *testing.T) {
 
 	time.Sleep(5 * time.Second)
 
-	assert.Equal(t, wc.namespace, controllerNamespace)
+	assert.Equal(t, wc.options.secretNamespace, controllerNamespace)
 	if wc.tunnels == nil {
 		t.Fatal("failing, tunnels is nil")
 	}
@@ -498,7 +500,9 @@ func TestTunnelServicesTwoNS(t *testing.T) {
 
 	fakeClient.Fake.AddWatchReactor("*", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 
-	wc := NewArgoController(fakeClient, TestConfig)
+	wc := NewArgoController(fakeClient,
+		SecretNamespace("cloudflare"),
+	)
 	// wc.EnableMetrics()cw
 
 	stopCh := make(chan struct{})
@@ -524,7 +528,7 @@ func TestTunnelServicesTwoNS(t *testing.T) {
 	// XXX - fix explicit sleep
 	time.Sleep(5 * time.Second)
 
-	assert.Equal(t, wc.namespace, controllerNamespace)
+	assert.Equal(t, wc.options.secretNamespace, controllerNamespace)
 	if wc.tunnels == nil {
 		t.Fatal("failing, tunnels is nil")
 	}

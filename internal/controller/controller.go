@@ -177,12 +177,12 @@ func handleIngressFunction(ingressClass string) func(obj interface{}) (string, b
 			glog.V(5).Infof("Object is not an ingress, don't handle")
 			return "", false
 		}
-		val, ok := ingress.Annotations[IngressClassKey]
+		val, ok := parseIngressClass(ingress)
 		if !ok {
-			glog.V(5).Infof("No annotation found for %s", IngressClassKey)
+			glog.V(5).Infof("No ingress class defined for ingress %s/%s", ingress.Namespace, ingress.Name)
 			return "", false
 		}
-		glog.V(5).Infof("Annotation %s=%s", IngressClassKey, val)
+		glog.V(5).Infof("Ingress %s/%s class=%s", ingress.Namespace, ingress.Name, val)
 		if val != ingressClass {
 			return "", false
 		}
@@ -547,12 +547,6 @@ func (argo *ArgoController) getHostNameForIngress(ingress *v1beta1.Ingress) stri
 	return ingress.Spec.Rules[0].Host
 }
 
-// assumes validation
-func (argo *ArgoController) getLBPoolForIngress(ingress *v1beta1.Ingress) string {
-	// if the value of LBPool is "", caller should assume that loadbalancing is disabled
-	return ingress.ObjectMeta.Annotations[IngressAnnotationLBPool]
-}
-
 func (argo *ArgoController) readSecret(hostname string) (*v1.Secret, error) {
 
 	var certSecret *v1.Secret
@@ -616,7 +610,7 @@ func (argo *ArgoController) createTunnel(key string, ingress *v1beta1.Ingress) e
 
 	servicePort := argo.getServicePortForIngress(ingress)
 	hostName := argo.getHostNameForIngress(ingress)
-	lbPool := argo.getLBPoolForIngress(ingress)
+	lbPool, _ := parseIngressLoadBalancer(ingress)
 
 	originCert, err := argo.readOriginCert(hostName)
 	if err != nil {
@@ -658,7 +652,7 @@ func (argo *ArgoController) updateTunnel(key string, ingress *v1beta1.Ingress) e
 	servicePort := argo.getServicePortForIngress(ingress)
 	serviceName := argo.getServiceNameForIngress(ingress)
 	hostName := argo.getHostNameForIngress(ingress)
-	lbPool := argo.getLBPoolForIngress(ingress)
+	lbPool, _ := parseIngressLoadBalancer(ingress)
 
 	config := t.Config()
 	if config.LBPool != lbPool || config.ExternalHostname != hostName || config.ServicePort != servicePort || config.ServiceName != serviceName {

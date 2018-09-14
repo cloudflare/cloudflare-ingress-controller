@@ -46,7 +46,6 @@
   name = "github.com/cloudflare/cloudflared"
   packages = [
     "h2mux",
-    "metrics",
     "origin",
     "tunnelrpc",
     "tunnelrpc/pogs",
@@ -696,12 +695,12 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
-    "github.com/cloudflare/cloudflared/metrics",
     "github.com/cloudflare/cloudflared/origin",
     "github.com/cloudflare/cloudflared/tunnelrpc/pogs",
     "github.com/golang/glog",
     "github.com/oklog/run",
     "github.com/pkg/errors",
+    "github.com/prometheus/client_golang/prometheus/promhttp",
     "github.com/sirupsen/logrus",
     "github.com/stretchr/testify/assert",
     "k8s.io/api/core/v1",

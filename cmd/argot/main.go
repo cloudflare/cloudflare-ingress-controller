@@ -9,9 +9,11 @@ import (
 	"syscall"
 
 	"github.com/cloudflare/cloudflare-ingress-controller/internal/controller"
+	"github.com/cloudflare/cloudflare-ingress-controller/internal/tunnel"
 	"github.com/cloudflare/cloudflare-ingress-controller/internal/version"
 	"github.com/golang/glog"
 	"github.com/oklog/run"
+	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -83,11 +85,15 @@ func main() {
 			cancel()
 		})
 	}
-
-	logger := log.New()
-	go func() {
-		tunnel.ServeMetrics(9090, stopCh, logger)
-	}()
+	{
+		logger := log.New()
+		stopCh := make(chan struct{})
+		g.Add(func() error {
+			return tunnel.ServeMetrics(9090, stopCh, logger)
+		}, func(error) {
+			close(stopCh)
+		})
+	}
 
 	if err := g.Run(); err != nil {
 		glog.Errorf("Received error, err=%v\n", err)

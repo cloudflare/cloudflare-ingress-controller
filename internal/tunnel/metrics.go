@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudflare/cloudflare-ingress-controller/pkg/version"
+	"github.com/cloudflare/cloudflare-ingress-controller/internal/version"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	// "github.com/cloudflare/cloudflared/metrics"

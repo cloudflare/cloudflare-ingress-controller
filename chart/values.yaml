@@ -22,3 +22,9 @@ rbac:
 serviceAccount:
   create: true
   name:
+
+metrics:
+  enabled: false
+  servicemonitor:
+    label: metrics
+    value: enabled

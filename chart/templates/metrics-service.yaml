@@ -1,0 +1,21 @@
+{{- if .Values.metrics.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: {{ template "argo-tunnel.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+    {{ .Values.metrics.servicemonitor.label }}: {{ .Values.metrics.servicemonitor.value }}
+  name: {{ template "argo-tunnel.fullname" . }}-metrics
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: metrics
+    protocol: TCP
+    name: metrics
+  selector:
+    app: {{ template "argo-tunnel.name" . }}
+{{- end }}

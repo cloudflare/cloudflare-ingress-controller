@@ -1,12 +1,8 @@
 *.swp
 *.swo
 bin/
-<<<<<<< HEAD
-vendor
-.cache
-.vscode
-=======
 .build/
+.cache/
 vendor/
 .vs/
 .vscode/
@@ -17,4 +13,3 @@ vendor/
 .AppleDouble
 .LSOverride
 .Trashes
->>>>>>> master

@@ -65,8 +65,7 @@ func NewArgoTunnelManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, 
 
 	haConnections := 1
 
-	protocolLogger := log.New()
-
+	protocolLogger := log.StandardLogger()
 	tunnelLogger := log.WithFields(log.Fields{
 		"service": config.ServiceName,
 	}).Logger
@@ -118,6 +117,10 @@ func (mgr *ArgoTunnelManager) Config() Config {
 	return *mgr.config
 }
 
+// func (mgr *ArgoTunnelManager) Logger() *log.Logger {
+// 	return mgr.tunnelConfig.Logger
+// }
+
 func (mgr *ArgoTunnelManager) Active() bool {
 	return mgr.stopCh != nil
 }
@@ -136,6 +139,7 @@ func (mgr *ArgoTunnelManager) Start(serviceURL string) error {
 	if err != nil {
 		return err
 	}
+
 	go func() {
 		mgr.errCh <- origin.StartTunnelDaemon(mgr.tunnelConfig, metricsUpdater, mgr.stopCh, placeHolderOnlyConnectedSignal)
 	}()

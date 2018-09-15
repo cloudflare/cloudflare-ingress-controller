@@ -86,10 +86,9 @@ func main() {
 		})
 	}
 	{
-		logger := log.New()
 		stopCh := make(chan struct{})
 		g.Add(func() error {
-			return tunnel.ServeMetrics(9090, stopCh, logger)
+			return tunnel.ServeMetrics(9090, stopCh, log.StandardLogger())
 		}, func(error) {
 			close(stopCh)
 		})

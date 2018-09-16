@@ -21,12 +21,8 @@ func main() {
 
 	kubeconfig := flag.String("kubeconfig", "", "Path to a kubeconfig file")
 	printVersion := flag.Bool("version", false, "prints application version")
-
-	config := &controller.Config{
-		MaxRetries: controller.MaxRetries,
-	}
-	flag.StringVar(&config.Namespace, "namespace", "default", "Namespace to run in")
-	flag.StringVar(&config.IngressClass, "ingressClass", controller.CloudflareArgoIngressType, "Name of ingress class, used in ingress annotation")
+	namespace := flag.String("namespace", controller.SecretNamespaceDefault, "Namespace to run in")
+	ingressClass := flag.String("ingressClass", controller.SecretNameDefault, "Name of ingress class, used in ingress annotation")
 
 	flag.Set("logtostderr", "true")
 	flag.Parse()
@@ -61,7 +57,10 @@ func main() {
 	}
 	{
 		ctx, cancel := context.WithCancel(context.Background())
-		argo := controller.NewArgoController(kclient, config)
+		argo := controller.NewArgoController(kclient,
+			controller.IngressClass(*ingressClass),
+			controller.SecretNamespace(*namespace),
+		)
 		argo.EnableMetrics()
 
 		g.Add(func() error {

@@ -26,7 +26,8 @@ import (
 
 // ArgoController object
 type ArgoController struct {
-	client kubernetes.Interface
+	client  kubernetes.Interface
+	options options
 
 	metricsConfig *tunnel.MetricsConfig
 
@@ -41,38 +42,28 @@ type ArgoController struct {
 	endpointsLister   lister_v1.EndpointsLister
 	endpointsInformer cache.Controller
 
-	// namespace of the controller
-	namespace string
-
 	// map of key to tunnels
 	// where key concatenates the namespace, ingressname and servicename
 	mux     sync.Mutex
 	tunnels map[string]tunnel.Tunnel
 }
 
-type Config struct {
-	IngressClass string
-	Namespace    string
-	MaxRetries   int
-}
-
-func NewArgoController(client kubernetes.Interface, config *Config) *ArgoController {
-
-	informer, indexer, queue := createIngressInformer(client, config.IngressClass)
+func NewArgoController(client kubernetes.Interface, options ...Option) *ArgoController {
+	opts := collectOptions(options)
+	informer, indexer, queue := createIngressInformer(client, opts.ingressClass)
 	tunnels := make(map[string]tunnel.Tunnel, 0)
 
 	argo := &ArgoController{
-		client: client,
-
+		client:        client,
+		options:       opts,
 		metricsConfig: tunnel.NewDummyMetrics(),
 
 		ingressInformer:  informer,
 		ingressWorkqueue: queue,
 		ingressLister:    lister_v1beta1.NewIngressLister(indexer),
 
-		namespace: config.Namespace,
-		mux:       sync.Mutex{},
-		tunnels:   tunnels,
+		mux:     sync.Mutex{},
+		tunnels: tunnels,
 	}
 	argo.configureServiceInformer()
 	argo.configureEndpointInformer()
@@ -555,7 +546,7 @@ func (argo *ArgoController) readSecret(hostname string) (*v1.Secret, error) {
 	// decrementing is overkill, because the only valid choice is one level down.
 	for i := range elements {
 		domain := strings.Join(elements[i:], ".")
-		certSecretList, err := argo.client.CoreV1().Secrets(argo.namespace).List(
+		certSecretList, err := argo.client.CoreV1().Secrets(argo.options.secretNamespace).List(
 			meta_v1.ListOptions{
 				LabelSelector: SecretLabelDomain + "=" + domain,
 			},
@@ -570,8 +561,8 @@ func (argo *ArgoController) readSecret(hostname string) (*v1.Secret, error) {
 		}
 	}
 
-	glog.V(5).Infof("Secret not found for label %s, hostname %s, trying default name %s", SecretLabelDomain, hostname, SecretName)
-	certSecret, err := argo.client.CoreV1().Secrets(argo.namespace).Get(SecretName, meta_v1.GetOptions{})
+	glog.V(5).Infof("Secret not found for label %s, hostname %s, trying default name %s", SecretLabelDomain, hostname, argo.options.secretName)
+	certSecret, err := argo.client.CoreV1().Secrets(argo.options.secretNamespace).Get(argo.options.secretName, meta_v1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -592,7 +583,7 @@ func (argo *ArgoController) readOriginCert(hostname string) ([]byte, error) {
 	certFileName := "cert.pem"
 	originCert := certSecret.Data[certFileName]
 	if len(originCert) == 0 {
-		return []byte{}, fmt.Errorf("Certificate data not found for host %s in secret %s/%s", hostname, SecretName, certFileName)
+		return []byte{}, fmt.Errorf("Certificate data not found for host %s in secret %s/%s", hostname, argo.options.secretName, certFileName)
 	}
 	return originCert, nil
 }

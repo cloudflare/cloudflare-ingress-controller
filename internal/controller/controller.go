@@ -68,6 +68,9 @@ func NewArgoController(client kubernetes.Interface, options ...Option) *ArgoCont
 	argo.configureServiceInformer()
 	argo.configureEndpointInformer()
 
+	if opts.enableMetrics {
+		argo.metricsConfig = tunnel.NewMetrics()
+	}
 	return argo
 }
 
@@ -93,11 +96,6 @@ func (argo *ArgoController) getTunnelsForService(namespace, serviceName string) 
 		}
 	}
 	return keys
-}
-
-// EnableMetrics configures a new metrics config for the controller
-func (argo *ArgoController) EnableMetrics() {
-	argo.metricsConfig = tunnel.NewMetrics()
 }
 
 func createIngressInformer(client kubernetes.Interface, ingressClass string) (cache.Controller, cache.Indexer, workqueue.RateLimitingInterface) {

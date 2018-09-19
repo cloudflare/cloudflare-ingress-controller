@@ -31,12 +31,14 @@ func TestOptions(t *testing.T) {
 		},
 		"set-all-options": {
 			in: []Option{
+				EnableMetrics(true),
 				IngressClass("test-class"),
 				SecretName("test-secret-name"),
 				SecretNamespace("test-secret-namespace"),
 				Version("test-version"),
 			},
 			out: options{
+				enableMetrics:   true,
 				ingressClass:    "test-class",
 				secretName:      "test-secret-name",
 				secretNamespace: "test-secret-namespace",

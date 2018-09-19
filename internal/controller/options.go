@@ -21,6 +21,7 @@ type options struct {
 	ingressClass    string
 	secretNamespace string
 	secretName      string
+	version         string
 }
 
 // Option provides behavior overrides
@@ -44,6 +45,13 @@ func SecretName(s string) Option {
 func SecretNamespace(s string) Option {
 	return func(o *options) {
 		o.secretNamespace = s
+	}
+}
+
+// Version defines the namespace used to house tunnel secrets
+func Version(s string) Option {
+	return func(o *options) {
+		o.version = s
 	}
 }
 

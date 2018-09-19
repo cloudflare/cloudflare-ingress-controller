@@ -16,6 +16,7 @@ func TestArgoTunnelConfig(t *testing.T) {
 		ExternalHostname: "acme.example.com",
 		LBPool:           "abc123",
 		OriginCert:       []byte("this is not a cert"),
+		Version:          "test",
 	}
 
 	metricsConfig := NewMetrics()

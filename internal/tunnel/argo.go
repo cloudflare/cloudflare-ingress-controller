@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/cloudflare/cloudflare-ingress-controller/internal/cloudflare"
-	"github.com/cloudflare/cloudflare-ingress-controller/internal/version"
 	"github.com/cloudflare/cloudflared/origin"
 	tunnelpogs "github.com/cloudflare/cloudflared/tunnelrpc/pogs"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
@@ -75,7 +74,7 @@ func NewArgoTunnelManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, 
 		MaxHeartbeats:     5,
 		ClientID:          utilrand.String(16),
 		BuildInfo:         origin.GetBuildInfo(),
-		ReportedVersion:   version.VERSION,
+		ReportedVersion:   config.Version,
 		LBPool:            config.LBPool,
 		Tags:              []tunnelpogs.Tag{},
 		HAConnections:     haConnections,

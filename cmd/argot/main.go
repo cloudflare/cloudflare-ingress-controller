@@ -6,16 +6,18 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"github.com/cloudflare/cloudflare-ingress-controller/internal/controller"
-	"github.com/cloudflare/cloudflare-ingress-controller/internal/version"
 	"github.com/golang/glog"
 	"github.com/oklog/run"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
+
+var version = "UNKNOWN"
 
 func main() {
 
@@ -28,7 +30,8 @@ func main() {
 	flag.Parse()
 
 	if *printVersion {
-		fmt.Printf("%s %s\n", version.APP_NAME, version.VERSION)
+		name := filepath.Base(os.Args[0])
+		fmt.Printf("%s %s\n", name, version)
 		os.Exit(0)
 	}
 
@@ -60,6 +63,7 @@ func main() {
 		argo := controller.NewArgoController(kclient,
 			controller.IngressClass(*ingressClass),
 			controller.SecretNamespace(*namespace),
+			controller.Version(version),
 		)
 		argo.EnableMetrics()
 

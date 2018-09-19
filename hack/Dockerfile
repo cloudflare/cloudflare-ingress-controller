@@ -9,7 +9,7 @@ COPY cmd cmd
 COPY internal internal
 RUN GO_EXTLINK_ENABLED=0 CGO_ENABLED=0 GOOS=ARG_OS GOARCH=ARG_ARCH GOARM=ARG_ARM go build \
     -o /go/bin/argot \
-    -ldflags="-w -s -extldflags -static -X github.com/cloudflare/cloudflare-ingress-controller/internal/version.VERSION=ARG_VERSION" \
+    -ldflags="-w -s -extldflags -static -X main.version=ARG_VERSION" \
     -tags netgo -installsuffix netgo \
     -v github.com/cloudflare/cloudflare-ingress-controller/cmd/argot
 

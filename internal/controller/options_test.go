@@ -34,11 +34,13 @@ func TestOptions(t *testing.T) {
 				IngressClass("test-class"),
 				SecretName("test-secret-name"),
 				SecretNamespace("test-secret-namespace"),
+				Version("test-version"),
 			},
 			out: options{
 				ingressClass:    "test-class",
 				secretName:      "test-secret-name",
 				secretNamespace: "test-secret-namespace",
+				version:         "test-version",
 			},
 		},
 	} {

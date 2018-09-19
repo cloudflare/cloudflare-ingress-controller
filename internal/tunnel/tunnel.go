@@ -38,4 +38,5 @@ type Config struct {
 	ExternalHostname string
 	LBPool           string
 	OriginCert       []byte
+	Version          string
 }

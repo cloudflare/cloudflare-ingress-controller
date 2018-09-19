@@ -616,6 +616,7 @@ func (argo *ArgoController) createTunnel(key string, ingress *v1beta1.Ingress) e
 		ExternalHostname: hostName,
 		LBPool:           lbPool,
 		OriginCert:       originCert,
+		Version:          argo.options.version,
 	}
 
 	tunnel, err := tunnel.NewArgoTunnelManager(config, argo.metricsConfig)

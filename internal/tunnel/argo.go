@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"reflect"
 	"time"
 
 	"github.com/cloudflare/cloudflare-ingress-controller/internal/cloudflare"
@@ -14,6 +15,12 @@ import (
 
 	log "github.com/sirupsen/logrus"
 )
+
+type argoTunnelStopError struct{}
+
+func (e argoTunnelStopError) Error() string {
+	return "tunnel is stopped"
+}
 
 // ArgoTunnelManager manages a single tunnel in a goroutine
 type ArgoTunnelManager struct {
@@ -50,11 +57,10 @@ func NewArgoTunnelManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, 
 
 	haConnections := 1
 
-	protocolLogger := log.New()
+	protocolLogger := log.StandardLogger()
+	tunnelLogger := log.StandardLogger()
 
-	tunnelLogger := log.WithFields(log.Fields{
-		"service": config.ServiceName,
-	}).Logger
+	tunnelLogger.Warn("Initializing tunnel manager")
 
 	httpTransport := newHttpTransport()
 	tlsConfig := &tls.Config{
@@ -69,7 +75,7 @@ func NewArgoTunnelManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, 
 		OriginCert:        config.OriginCert, // []byte{}
 		TlsConfig:         tlsConfig,
 		ClientTlsConfig:   httpTransport.TLSClientConfig, // *tls.Config
-		Retries:           5,
+		Retries:           8,                             // backoff retry maximum=2^8 seconds
 		HeartbeatInterval: 5 * time.Second,
 		MaxHeartbeats:     5,
 		ClientID:          utilrand.String(16),
@@ -93,7 +99,7 @@ func NewArgoTunnelManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, 
 		id:           utilrand.String(8),
 		config:       config,
 		tunnelConfig: &tunnelConfig,
-		errCh:        make(chan error),
+		errCh:        nil,
 		stopCh:       nil,
 	}
 	return &mgr, nil
@@ -109,6 +115,11 @@ func (mgr *ArgoTunnelManager) Active() bool {
 
 func (mgr *ArgoTunnelManager) Start(serviceURL string) error {
 
+	mgr.tunnelConfig.Logger.WithFields(log.Fields{
+		"service":  mgr.Config().ServiceName,
+		"hostname": mgr.Config().ExternalHostname,
+	}).Infof("starting tunnel")
+
 	if serviceURL == "" {
 		return fmt.Errorf("Cannot start tunnel for %s with empty url", mgr.Config().ServiceName)
 	}
@@ -116,25 +127,77 @@ func (mgr *ArgoTunnelManager) Start(serviceURL string) error {
 
 	placeHolderOnlyConnectedSignal := make(chan struct{})
 	mgr.stopCh = make(chan struct{})
+	mgr.errCh = make(chan error)
 
+	// error handler
+	go func() {
+		mgr.tunnelConfig.Logger.WithFields(log.Fields{
+			"service":  mgr.Config().ServiceName,
+			"hostname": mgr.Config().ExternalHostname,
+		}).Infof("Starting error receiver")
+		for {
+			select {
+			case err, open := <-mgr.errCh:
+				if !open {
+					return
+				}
+				mgr.tunnelConfig.Logger.WithFields(log.Fields{
+					"service":  mgr.Config().ServiceName,
+					"hostname": mgr.Config().ExternalHostname,
+				}).Errorf("Received error (%s) %v", reflect.TypeOf(err), err)
+
+				// the errors are all un-exported from origin package :(
+				// hard to figure out when to retry then
+				switch err.(type) {
+
+				case argoTunnelStopError:
+					mgr.tunnelConfig.Logger.WithFields(log.Fields{
+						"service":  mgr.Config().ServiceName,
+						"hostname": mgr.Config().ExternalHostname,
+					}).Errorf("Stopping tunnel")
+					return
+
+				default:
+					mgr.tunnelConfig.Logger.WithFields(log.Fields{
+						"service":  mgr.Config().ServiceName,
+						"hostname": mgr.Config().ExternalHostname,
+					}).Errorf("Retrying tunnel")
+					mgr.Start(serviceURL)
+				}
+			}
+		}
+	}()
+
+	// tunnel start
 	go func() {
 		mgr.errCh <- origin.StartTunnelDaemon(mgr.tunnelConfig, mgr.stopCh, placeHolderOnlyConnectedSignal)
 	}()
+
 	return nil
 }
 
 func (mgr *ArgoTunnelManager) Stop() error {
+	mgr.tunnelConfig.Logger.WithFields(log.Fields{
+		"service":  mgr.Config().ServiceName,
+		"hostname": mgr.Config().ExternalHostname,
+	}).Infof("stopping tunnel")
+
 	if mgr.stopCh == nil {
 		return fmt.Errorf("tunnel %s already stopped", mgr.id)
 	}
+	mgr.errCh <- argoTunnelStopError{}
 	close(mgr.stopCh)
 	mgr.tunnelConfig.OriginUrl = ""
 	mgr.stopCh = nil
-	<-mgr.errCh // muxerShutdownError is not an error
+
 	return nil
 }
 
 func (mgr *ArgoTunnelManager) TearDown() error {
+	if mgr.errCh != nil {
+		close(mgr.errCh)
+		mgr.errCh = nil
+	}
 	return mgr.Stop()
 }
 

@@ -359,7 +359,6 @@ func TestTunnelInitialization(t *testing.T) {
 	wc := NewArgoController(fakeClient,
 		SecretNamespace("cloudflare"),
 	)
-	// wc.EnableMetrics()cw
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -416,7 +415,6 @@ func TestTunnelServiceInitialization(t *testing.T) {
 	wc := NewArgoController(fakeClient,
 		SecretNamespace("cloudflare"),
 	)
-	// wc.EnableMetrics()cw
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -503,7 +501,6 @@ func TestTunnelServicesTwoNS(t *testing.T) {
 	wc := NewArgoController(fakeClient,
 		SecretNamespace("cloudflare"),
 	)
-	// wc.EnableMetrics()cw
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)

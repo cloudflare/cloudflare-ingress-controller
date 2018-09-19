@@ -61,11 +61,11 @@ func main() {
 	{
 		ctx, cancel := context.WithCancel(context.Background())
 		argo := controller.NewArgoController(kclient,
+			controller.EnableMetrics(true),
 			controller.IngressClass(*ingressClass),
 			controller.SecretNamespace(*namespace),
 			controller.Version(version),
 		)
-		argo.EnableMetrics()
 
 		g.Add(func() error {
 			argo.Run(ctx.Done())

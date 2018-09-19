@@ -22,7 +22,7 @@ func main() {
 	kubeconfig := flag.String("kubeconfig", "", "Path to a kubeconfig file")
 	printVersion := flag.Bool("version", false, "prints application version")
 	namespace := flag.String("namespace", controller.SecretNamespaceDefault, "Namespace to run in")
-	ingressClass := flag.String("ingressClass", controller.SecretNameDefault, "Name of ingress class, used in ingress annotation")
+	ingressClass := flag.String("ingressClass", controller.IngressClassDefault, "Name of ingress class, used in ingress annotation")
 
 	flag.Set("logtostderr", "true")
 	flag.Parse()

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/cloudflare/cloudflare-ingress-controller/internal/cloudflare"
@@ -22,10 +23,10 @@ type ArgoTunnelManager struct {
 	tunnelConfig *origin.TunnelConfig
 	errCh        chan error
 	stopCh       chan struct{}
+	mu           sync.RWMutex
 }
 
 func newHttpTransport() *http.Transport {
-
 	tlsConfig := &tls.Config{}
 
 	httpTransport := &http.Transport{
@@ -104,22 +105,28 @@ func (mgr *ArgoTunnelManager) Config() Config {
 }
 
 func (mgr *ArgoTunnelManager) Active() bool {
+	mgr.mu.RLock()
+	defer mgr.mu.RUnlock()
 	return mgr.stopCh != nil
 }
 
 func (mgr *ArgoTunnelManager) Start(serviceURL string) error {
-
 	if serviceURL == "" {
 		return fmt.Errorf("Cannot start tunnel for %s with empty url", mgr.Config().ServiceName)
+	} else if mgr.stopCh != nil {
+		return nil
 	}
-	mgr.tunnelConfig.OriginUrl = serviceURL
 
-	placeHolderOnlyConnectedSignal := make(chan struct{})
-	mgr.stopCh = make(chan struct{})
-
-	go func() {
-		mgr.errCh <- origin.StartTunnelDaemon(mgr.tunnelConfig, mgr.stopCh, placeHolderOnlyConnectedSignal)
-	}()
+	mgr.mu.Lock()
+	defer mgr.mu.Unlock()
+	if mgr.stopCh == nil {
+		mgr.tunnelConfig.OriginUrl = serviceURL
+		dummyChan := make(chan struct{})
+		mgr.stopCh = make(chan struct{})
+		go func() {
+			mgr.errCh <- origin.StartTunnelDaemon(mgr.tunnelConfig, mgr.stopCh, dummyChan)
+		}()
+	}
 	return nil
 }
 
@@ -127,10 +134,15 @@ func (mgr *ArgoTunnelManager) Stop() error {
 	if mgr.stopCh == nil {
 		return fmt.Errorf("tunnel %s already stopped", mgr.id)
 	}
-	close(mgr.stopCh)
-	mgr.tunnelConfig.OriginUrl = ""
-	mgr.stopCh = nil
-	<-mgr.errCh // muxerShutdownError is not an error
+
+	mgr.mu.Lock()
+	defer mgr.mu.Unlock()
+	if mgr.stopCh != nil {
+		close(mgr.stopCh)
+		mgr.tunnelConfig.OriginUrl = ""
+		mgr.stopCh = nil
+		<-mgr.errCh // muxerShutdownError is not an error
+	}
 	return nil
 }
 

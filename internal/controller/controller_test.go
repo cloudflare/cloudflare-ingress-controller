@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/fake"
 	ktesting "k8s.io/client-go/testing"
@@ -44,7 +45,7 @@ func checkServiceKey(t *testing.T, check serviceKeyCheck) {
 }
 
 func TestServiceKey(t *testing.T) {
-
+	t.Parallel()
 	checks := []serviceKeyCheck{
 		{
 			"add:default/nginx",
@@ -104,7 +105,7 @@ func checkIngressKey(t *testing.T, check ingressKeyCheck) {
 }
 
 func TestIngressKey(t *testing.T) {
-
+	t.Parallel()
 	ingressSpecNginx := v1beta1.IngressSpec{
 		Rules: []v1beta1.IngressRule{
 			{
@@ -174,6 +175,7 @@ func TestIngressKey(t *testing.T) {
 }
 
 func TestSimple(t *testing.T) {
+	t.Parallel()
 	fakeClient := &fake.Clientset{}
 	nothingPod := v1.Pod{}
 
@@ -193,6 +195,7 @@ func TestSimple(t *testing.T) {
 }
 
 func TestAction(t *testing.T) {
+	t.Parallel()
 	serviceNamespace := "acme"
 	fakeClient := &fake.Clientset{}
 	actualPod := v1.Pod{
@@ -224,6 +227,7 @@ func TestAction(t *testing.T) {
 }
 
 func TestNewArgoController(t *testing.T) {
+	t.Parallel()
 	controllerNamespace := "cloudflare" // "cloudflare"
 	fakeClient := &fake.Clientset{}
 
@@ -234,12 +238,14 @@ func TestNewArgoController(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go wc.Run(stopCh)
-	// wait for cache sync
-	time.Sleep(time.Second)
+
+	cache.WaitForCacheSync(stopCh,
+		wc.ingressInformer.HasSynced,
+		wc.serviceInformer.HasSynced,
+	)
 
 	assert.Equal(t, wc.options.secretNamespace, controllerNamespace)
-	assert.NotNil(t, wc.tunnels)
-	assert.Equal(t, 0, len(wc.tunnels))
+	assert.Equal(t, 0, wc.tunnels.Len())
 }
 
 type tunnelItems struct {
@@ -309,6 +315,7 @@ func getTunnelItems(namespace string) tunnelItems {
 }
 
 func TestControllerLookups(t *testing.T) {
+	t.Parallel()
 	fakeClient := &fake.Clientset{}
 
 	serviceNamespace := "acme"
@@ -328,6 +335,7 @@ func TestControllerLookups(t *testing.T) {
 }
 
 func TestTunnelInitialization(t *testing.T) {
+	t.Parallel()
 	fakeClient := &fake.Clientset{}
 
 	serviceNamespace := "acme"
@@ -364,19 +372,22 @@ func TestTunnelInitialization(t *testing.T) {
 	defer close(stopCh)
 	go wc.Run(stopCh)
 
-	// wait for cache sync
-	time.Sleep(time.Second)
+	cache.WaitForCacheSync(stopCh,
+		wc.ingressInformer.HasSynced,
+		wc.serviceInformer.HasSynced,
+	)
+
+	wait.Poll(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+		done = wc.tunnels.Len() > 0
+		return
+	})
 
 	assert.Equal(t, wc.options.secretNamespace, controllerNamespace)
-	if wc.tunnels == nil {
-		t.Fatal("failing, tunnels is nil")
-	}
-	assert.NotNil(t, wc.tunnels)
-	assert.Equal(t, 1, len(wc.tunnels))
+	assert.Equal(t, 1, wc.tunnels.Len())
 
 	key := constructIngressKey(&items.Ingress)
-	fooTunnel := wc.getTunnel(key)
-	if fooTunnel == nil {
+	fooTunnel, ok := wc.tunnels.Load(key)
+	if !ok {
 		t.Fatalf("failing, tunnel is nil for %s", key)
 	}
 	assert.False(t, fooTunnel.Active())
@@ -387,6 +398,7 @@ func TestTunnelInitialization(t *testing.T) {
 }
 
 func TestTunnelServiceInitialization(t *testing.T) {
+	t.Parallel()
 	fakeClient := &fake.Clientset{}
 
 	controllerNamespace := "cloudflare"
@@ -420,8 +432,10 @@ func TestTunnelServiceInitialization(t *testing.T) {
 	defer close(stopCh)
 	go wc.Run(stopCh)
 
-	// wait for cache sync
-	time.Sleep(time.Second)
+	cache.WaitForCacheSync(stopCh,
+		wc.ingressInformer.HasSynced,
+		wc.serviceInformer.HasSynced,
+	)
 
 	// add the service now
 	fakeClient.Fake.AddReactor("list", "services", func(action ktesting.Action) (bool, runtime.Object, error) {
@@ -434,17 +448,17 @@ func TestTunnelServiceInitialization(t *testing.T) {
 	getServiceAction := ktesting.NewCreateAction(serviceResource, serviceNamespace, &items.Service)
 	_, _ = fakeClient.Invokes(getServiceAction, &v1.Service{})
 
-	time.Sleep(5 * time.Second)
+	wait.Poll(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+		done = wc.tunnels.Len() > 0
+		return
+	})
 
 	assert.Equal(t, wc.options.secretNamespace, controllerNamespace)
-	if wc.tunnels == nil {
-		t.Fatal("failing, tunnels is nil")
-	}
-	assert.Equal(t, 1, len(wc.tunnels))
+	assert.Equal(t, 1, wc.tunnels.Len())
 
 	key := constructIngressKey(&items.Ingress)
-	fooTunnel := wc.getTunnel(key)
-	if fooTunnel == nil {
+	fooTunnel, ok := wc.tunnels.Load(key)
+	if !ok {
 		t.Fatalf("failing, tunnel is nil for %s", key)
 	}
 	assert.False(t, fooTunnel.Active())
@@ -455,6 +469,7 @@ func TestTunnelServiceInitialization(t *testing.T) {
 }
 
 func TestTunnelServicesTwoNS(t *testing.T) {
+	t.Parallel()
 	fakeClient := &fake.Clientset{}
 
 	controllerNamespace := "cloudflare"
@@ -522,19 +537,18 @@ func TestTunnelServicesTwoNS(t *testing.T) {
 	getServiceAction := ktesting.NewCreateAction(serviceResource, items[0].Ingress.GetNamespace(), &items[0].Service)
 	_, _ = fakeClient.Invokes(getServiceAction, &v1.Service{})
 
-	// XXX - fix explicit sleep
-	time.Sleep(5 * time.Second)
+	wait.Poll(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+		done = wc.tunnels.Len() > 0
+		return
+	})
 
 	assert.Equal(t, wc.options.secretNamespace, controllerNamespace)
-	if wc.tunnels == nil {
-		t.Fatal("failing, tunnels is nil")
-	}
-	assert.Equal(t, 2, len(wc.tunnels))
+	assert.Equal(t, 2, wc.tunnels.Len())
 
 	for _, item := range items {
 		key := constructIngressKey(&item.Ingress)
-		tunnel := wc.getTunnel(key)
-		if tunnel == nil {
+		tunnel, ok := wc.tunnels.Load(key)
+		if !ok {
 			t.Fatalf("failing, tunnel is nil for %s", key)
 		}
 		assert.False(t, tunnel.Active())

@@ -121,7 +121,7 @@ push: container
 staticcheck:
 	@echo static checking code for issues
 	@go get honnef.co/go/tools/cmd/staticcheck
-	staticcheck $(SRCS)
+	@staticcheck $(SRCS)
 
 .PHONY: test
 test: install
@@ -130,13 +130,14 @@ test: install
 
 .PHONY: test-race
 test-race: | test
+	@echo testing code for races
 	@go test -race ./...
 
 .PHONY: unused
 unused:
 	@echo checking code for unused definitions
 	@go get honnef.co/go/tools/cmd/unused
-	unused -exported $(SRCS)
+	@unused -exported $(SRCS)
 
 .PHONY: version
 version:

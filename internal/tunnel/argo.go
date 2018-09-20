@@ -16,6 +16,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const (
+	haConectionsDefault = 4
+)
+
 // ArgoTunnelManager manages a single tunnel in a goroutine
 type ArgoTunnelManager struct {
 	id           string
@@ -48,9 +52,6 @@ func newHttpTransport() *http.Transport {
 
 // NewArgoTunnelManager is a wrapper around a argo tunnel running in a goroutine
 func NewArgoTunnelManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, error) {
-
-	haConnections := 1
-
 	protocolLogger := log.New()
 
 	tunnelLogger := log.WithFields(log.Fields{
@@ -78,7 +79,7 @@ func NewArgoTunnelManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, 
 		ReportedVersion:   config.Version,
 		LBPool:            config.LBPool,
 		Tags:              []tunnelpogs.Tag{},
-		HAConnections:     haConnections,
+		HAConnections:     haConectionsDefault,
 		HTTPTransport:     httpTransport,
 		Metrics:           metricsSetup.Metrics,
 		MetricsUpdateFreq: metricsSetup.UpdateFrequency,

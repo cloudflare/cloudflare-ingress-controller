@@ -31,7 +31,7 @@ func TestArgoTunnelConfig(t *testing.T) {
 	assert.Equal(t, argot.tunnelConfig.LBPool, config.LBPool)
 	assert.Equal(t, argot.tunnelConfig.OriginCert, config.OriginCert)
 
-	assert.Equal(t, argot.tunnelConfig.HAConnections, 1)
+	assert.Equal(t, argot.tunnelConfig.HAConnections, haConectionsDefault)
 	assert.NotNil(t, argot.tunnelConfig.ProtocolLogger)
 
 	assert.Equal(t, argot.config.ServiceName, config.ServiceName)

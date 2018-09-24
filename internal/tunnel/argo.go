@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	haConectionsDefault = 4
+	haConnectionsDefault = 4
 )
 
 // ArgoTunnelManager manages a single tunnel in a goroutine
@@ -79,7 +79,7 @@ func NewArgoTunnelManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, 
 		ReportedVersion:   config.Version,
 		LBPool:            config.LBPool,
 		Tags:              []tunnelpogs.Tag{},
-		HAConnections:     haConectionsDefault,
+		HAConnections:     haConnectionsDefault,
 		HTTPTransport:     httpTransport,
 		Metrics:           metricsSetup.Metrics,
 		MetricsUpdateFreq: metricsSetup.UpdateFrequency,

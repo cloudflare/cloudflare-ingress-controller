@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	util_runtime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
@@ -300,6 +301,7 @@ func (argo *ArgoController) isWatchedEndpoint(ep *v1.Endpoints) (ok bool) {
 }
 
 func (argo *ArgoController) Run(stopCh <-chan struct{}) {
+	defer util_runtime.HandleCrash()
 	defer argo.ingressWorkqueue.ShutDown()
 	defer argo.serviceWorkqueue.ShutDown()
 

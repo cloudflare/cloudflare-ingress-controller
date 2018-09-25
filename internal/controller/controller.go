@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	util_runtime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
@@ -24,8 +25,8 @@ import (
 	"k8s.io/client-go/util/workqueue"
 )
 
-// ArgoController object
-type ArgoController struct {
+// TunnelController object
+type TunnelController struct {
 	client  kubernetes.Interface
 	options options
 
@@ -46,11 +47,11 @@ type ArgoController struct {
 	tunnels tunnel.Registry
 }
 
-func NewArgoController(client kubernetes.Interface, options ...Option) *ArgoController {
+func NewTunnelController(client kubernetes.Interface, options ...Option) *TunnelController {
 	opts := collectOptions(options)
 	informer, indexer, queue := createIngressInformer(client, opts.ingressClass)
 
-	argo := &ArgoController{
+	c := &TunnelController{
 		client:        client,
 		options:       opts,
 		metricsConfig: tunnel.NewDummyMetrics(),
@@ -59,18 +60,18 @@ func NewArgoController(client kubernetes.Interface, options ...Option) *ArgoCont
 		ingressWorkqueue: queue,
 		ingressLister:    lister_v1beta1.NewIngressLister(indexer),
 	}
-	argo.configureServiceInformer()
-	argo.configureEndpointInformer()
+	c.configureServiceInformer()
+	c.configureEndpointInformer()
 
 	if opts.enableMetrics {
-		argo.metricsConfig = tunnel.NewMetrics()
+		c.metricsConfig = tunnel.NewMetrics()
 	}
-	return argo
+	return c
 }
 
-func (argo *ArgoController) getTunnelsForService(namespace, name string) []string {
+func (c *TunnelController) getTunnelsForService(namespace, name string) []string {
 	var keys []string
-	argo.tunnels.Range(func(k string, t tunnel.Tunnel) bool {
+	c.tunnels.Range(func(k string, t tunnel.Tunnel) bool {
 		if name == t.Config().ServiceName && namespace == t.Config().ServiceNamespace {
 			keys = append(keys, k)
 		}
@@ -160,16 +161,16 @@ func handleIngressFunction(ingressClass string) func(obj interface{}) (string, b
 	}
 }
 
-func (argo *ArgoController) configureServiceInformer() {
+func (c *TunnelController) configureServiceInformer() {
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	indexer, informer := cache.NewIndexerInformer(
 
 		&cache.ListWatch{
 			ListFunc: func(lo meta_v1.ListOptions) (runtime.Object, error) {
-				return argo.client.CoreV1().Services(v1.NamespaceAll).List(lo)
+				return c.client.CoreV1().Services(v1.NamespaceAll).List(lo)
 			},
 			WatchFunc: func(lo meta_v1.ListOptions) (watch.Interface, error) {
-				return argo.client.CoreV1().Services(v1.NamespaceAll).Watch(lo)
+				return c.client.CoreV1().Services(v1.NamespaceAll).Watch(lo)
 			},
 		},
 
@@ -183,21 +184,21 @@ func (argo *ArgoController) configureServiceInformer() {
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				svc, ok := obj.(*v1.Service)
-				if !ok || !argo.isWatchedService(svc) {
+				if !ok || !c.isWatchedService(svc) {
 					return
 				}
 				queue.Add("add:" + constructServiceKey(svc))
 			},
 			UpdateFunc: func(old, new interface{}) {
 				svc, ok := new.(*v1.Service)
-				if !ok || !argo.isWatchedService(svc) {
+				if !ok || !c.isWatchedService(svc) {
 					return
 				}
 				queue.Add("update:" + constructServiceKey(svc))
 			},
 			DeleteFunc: func(obj interface{}) {
 				svc, ok := obj.(*v1.Service)
-				if !ok || !argo.isWatchedService(svc) {
+				if !ok || !c.isWatchedService(svc) {
 					return
 				}
 				queue.Add("delete:" + constructServiceKey(svc))
@@ -205,20 +206,20 @@ func (argo *ArgoController) configureServiceInformer() {
 		},
 		cache.Indexers{},
 	)
-	argo.serviceInformer = informer
-	argo.serviceLister = lister_v1.NewServiceLister(indexer)
-	argo.serviceWorkqueue = queue
+	c.serviceInformer = informer
+	c.serviceLister = lister_v1.NewServiceLister(indexer)
+	c.serviceWorkqueue = queue
 }
 
 // is this service one of the ones we have a tunnel for?
-func (argo *ArgoController) isWatchedService(service *v1.Service) (ok bool) {
+func (c *TunnelController) isWatchedService(service *v1.Service) (ok bool) {
 	svcMeta, err := meta.Accessor(service)
 	if err != nil {
 		return
 	}
 
 	name, ns := svcMeta.GetName(), svcMeta.GetNamespace()
-	argo.tunnels.Range(func(k string, t tunnel.Tunnel) bool {
+	c.tunnels.Range(func(k string, t tunnel.Tunnel) bool {
 		if name == t.Config().ServiceName && ns == t.Config().ServiceNamespace {
 			glog.V(5).Infof("Watching service %s/%s", ns, name)
 			// set outer return and trigger stop condition
@@ -230,16 +231,16 @@ func (argo *ArgoController) isWatchedService(service *v1.Service) (ok bool) {
 	return
 }
 
-func (argo *ArgoController) configureEndpointInformer() {
+func (c *TunnelController) configureEndpointInformer() {
 
 	indexer, informer := cache.NewIndexerInformer(
 
 		&cache.ListWatch{
 			ListFunc: func(lo meta_v1.ListOptions) (runtime.Object, error) {
-				return argo.client.CoreV1().Endpoints(v1.NamespaceAll).List(lo)
+				return c.client.CoreV1().Endpoints(v1.NamespaceAll).List(lo)
 			},
 			WatchFunc: func(lo meta_v1.ListOptions) (watch.Interface, error) {
-				return argo.client.CoreV1().Endpoints(v1.NamespaceAll).Watch(lo)
+				return c.client.CoreV1().Endpoints(v1.NamespaceAll).Watch(lo)
 			},
 		},
 
@@ -253,41 +254,41 @@ func (argo *ArgoController) configureEndpointInformer() {
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				ep, ok := obj.(*v1.Endpoints)
-				if !ok || !argo.isWatchedEndpoint(ep) {
+				if !ok || !c.isWatchedEndpoint(ep) {
 					return
 				}
-				argo.serviceWorkqueue.Add("update:" + constructEndpointKey(ep))
+				c.serviceWorkqueue.Add("update:" + constructEndpointKey(ep))
 			},
 			UpdateFunc: func(old, new interface{}) {
 				ep, ok := new.(*v1.Endpoints)
-				if !ok || !argo.isWatchedEndpoint(ep) {
+				if !ok || !c.isWatchedEndpoint(ep) {
 					return
 				}
-				argo.serviceWorkqueue.Add("update:" + constructEndpointKey(ep))
+				c.serviceWorkqueue.Add("update:" + constructEndpointKey(ep))
 			},
 			DeleteFunc: func(obj interface{}) {
 				ep, ok := obj.(*v1.Endpoints)
-				if !ok || !argo.isWatchedEndpoint(ep) {
+				if !ok || !c.isWatchedEndpoint(ep) {
 					return
 				}
-				argo.serviceWorkqueue.Add("update:" + constructEndpointKey(ep))
+				c.serviceWorkqueue.Add("update:" + constructEndpointKey(ep))
 			},
 		},
 		cache.Indexers{},
 	)
-	argo.endpointsInformer = informer
-	argo.endpointsLister = lister_v1.NewEndpointsLister(indexer)
+	c.endpointsInformer = informer
+	c.endpointsLister = lister_v1.NewEndpointsLister(indexer)
 }
 
 // is this endpoint interesting?
-func (argo *ArgoController) isWatchedEndpoint(ep *v1.Endpoints) (ok bool) {
+func (c *TunnelController) isWatchedEndpoint(ep *v1.Endpoints) (ok bool) {
 	epMeta, err := meta.Accessor(ep)
 	if err != nil {
 		return
 	}
 
 	name, ns := epMeta.GetName(), epMeta.GetNamespace()
-	argo.tunnels.Range(func(k string, t tunnel.Tunnel) bool {
+	c.tunnels.Range(func(k string, t tunnel.Tunnel) bool {
 		if name == t.Config().ServiceName {
 			glog.V(5).Infof("Watching endpoint %s/%s", ns, name)
 			// set outer return and trigger stop condition
@@ -299,49 +300,50 @@ func (argo *ArgoController) isWatchedEndpoint(ep *v1.Endpoints) (ok bool) {
 	return
 }
 
-func (argo *ArgoController) Run(stopCh <-chan struct{}) {
-	defer argo.ingressWorkqueue.ShutDown()
-	defer argo.serviceWorkqueue.ShutDown()
+func (c *TunnelController) Run(stopCh <-chan struct{}) {
+	defer util_runtime.HandleCrash()
+	defer c.ingressWorkqueue.ShutDown()
+	defer c.serviceWorkqueue.ShutDown()
 
 	glog.Info("Starting ArgoController")
 
-	go argo.serviceInformer.Run(stopCh)
-	go argo.endpointsInformer.Run(stopCh)
-	go argo.ingressInformer.Run(stopCh)
+	go c.serviceInformer.Run(stopCh)
+	go c.endpointsInformer.Run(stopCh)
+	go c.ingressInformer.Run(stopCh)
 
 	// Wait for all caches to be synced, before processing items from the queue is started
-	if !cache.WaitForCacheSync(stopCh, argo.ingressInformer.HasSynced) {
+	if !cache.WaitForCacheSync(stopCh, c.ingressInformer.HasSynced) {
 		glog.Error(fmt.Errorf("Timed out waiting for caches to sync"))
 		return
 	}
-	if !cache.WaitForCacheSync(stopCh, argo.serviceInformer.HasSynced) {
+	if !cache.WaitForCacheSync(stopCh, c.serviceInformer.HasSynced) {
 		glog.Error(fmt.Errorf("Timed out waiting for caches to sync"))
 		return
 	}
 
-	go wait.Until(argo.runIngressWorker, time.Second, stopCh)
-	go wait.Until(argo.runServiceWorker, time.Second, stopCh)
+	go wait.Until(c.runIngressWorker, time.Second, stopCh)
+	go wait.Until(c.runServiceWorker, time.Second, stopCh)
 
 	<-stopCh
 	glog.Info("Stopping ArgoController ")
-	argo.tearDown()
+	c.tearDown()
 }
 
-func (argo *ArgoController) runIngressWorker() {
-	for argo.processNextIngress() {
+func (c *TunnelController) runIngressWorker() {
+	for c.processNextIngress() {
 	}
 }
 
-func (argo *ArgoController) processNextIngress() bool {
+func (c *TunnelController) processNextIngress() bool {
 
-	key, quit := argo.ingressWorkqueue.Get()
+	key, quit := c.ingressWorkqueue.Get()
 	if quit {
 		return false
 	}
-	defer argo.ingressWorkqueue.Done(key)
+	defer c.ingressWorkqueue.Done(key)
 
-	err := argo.processIngress(key.(string))
-	handleErr(err, key, argo.ingressWorkqueue)
+	err := c.processIngress(key.(string))
+	handleErr(err, key, c.ingressWorkqueue)
 	return true
 }
 
@@ -387,7 +389,7 @@ func parseIngressKey(queueKey string) (string, string, string, string) {
 	return op, namespace, ingressName, serviceName
 }
 
-func (argo *ArgoController) processIngress(queueKey string) error {
+func (c *TunnelController) processIngress(queueKey string) error {
 
 	op, namespace, ingressname, servicename := parseIngressKey(queueKey)
 
@@ -395,37 +397,37 @@ func (argo *ArgoController) processIngress(queueKey string) error {
 
 	case "add":
 
-		ingress, err := argo.ingressLister.Ingresses(namespace).Get(ingressname)
+		ingress, err := c.ingressLister.Ingresses(namespace).Get(ingressname)
 		if err != nil {
-			all, _ := argo.ingressLister.Ingresses(namespace).List(labels.Everything())
+			all, _ := c.ingressLister.Ingresses(namespace).List(labels.Everything())
 			glog.V(2).Infof("all ingresses in %s: %v", "*", all)
 			return fmt.Errorf("failed to retrieve ingress by name %q: %v", ingressname, err)
 		}
 		key := constructIngressKey(ingress)
 
-		tunnel, ok := argo.tunnels.Load(key)
+		tunnel, ok := c.tunnels.Load(key)
 		if ok {
 			glog.V(5).Infof("Tunnel \"%s\" (%s) already exists", key, tunnel.Config().ExternalHostname)
 			return nil
 		}
 
-		return argo.createTunnel(key, ingress)
+		return c.createTunnel(key, ingress)
 
 	case "delete":
 		key := constructIngressKeyFromStrings(namespace, ingressname, servicename)
-		return argo.removeTunnel(key)
+		return c.removeTunnel(key)
 
 	case "update":
 
-		ingress, err := argo.ingressLister.Ingresses(namespace).Get(ingressname)
+		ingress, err := c.ingressLister.Ingresses(namespace).Get(ingressname)
 		if err != nil {
-			all, _ := argo.ingressLister.Ingresses(namespace).List(labels.Everything())
+			all, _ := c.ingressLister.Ingresses(namespace).List(labels.Everything())
 			glog.V(2).Infof("all ingresses in %s: %v", "*", all)
 			return fmt.Errorf("failed to retrieve ingress by name %q: %v", ingressname, err)
 		}
 		key := constructIngressKey(ingress)
 
-		return argo.updateTunnel(key, ingress)
+		return c.updateTunnel(key, ingress)
 
 	default:
 		return fmt.Errorf("Unhandled operation \"%s\"", op)
@@ -433,29 +435,29 @@ func (argo *ArgoController) processIngress(queueKey string) error {
 	}
 }
 
-func (argo *ArgoController) runServiceWorker() {
-	for argo.processNextService() {
+func (c *TunnelController) runServiceWorker() {
+	for c.processNextService() {
 	}
 }
 
-func (argo *ArgoController) processNextService() bool {
+func (c *TunnelController) processNextService() bool {
 
-	key, quit := argo.serviceWorkqueue.Get()
+	key, quit := c.serviceWorkqueue.Get()
 	if quit {
 		return false
 	}
-	defer argo.serviceWorkqueue.Done(key)
+	defer c.serviceWorkqueue.Done(key)
 
-	err := argo.processService(key.(string))
-	handleErr(err, key, argo.serviceWorkqueue)
+	err := c.processService(key.(string))
+	handleErr(err, key, c.serviceWorkqueue)
 	return true
 }
 
-func (argo *ArgoController) processService(queueKey string) error {
+func (c *TunnelController) processService(queueKey string) error {
 
 	_, namespace, serviceName := parseServiceKey(queueKey)
 
-	keys := argo.getTunnelsForService(namespace, serviceName)
+	keys := c.getTunnelsForService(namespace, serviceName)
 	if len(keys) == 0 {
 		// no tunnels or ingresses exist for this service
 		return nil
@@ -463,7 +465,7 @@ func (argo *ArgoController) processService(queueKey string) error {
 
 	var errorMessage string
 	for _, key := range keys {
-		err := argo.evaluateTunnelStatus(key)
+		err := c.evaluateTunnelStatus(key)
 		if err != nil {
 			if errorMessage == "" {
 				errorMessage = err.Error()
@@ -497,7 +499,7 @@ func handleErr(err error, key interface{}, queue workqueue.RateLimitingInterface
 }
 
 // returns non-nil error if the ingress is not something we can deal with
-func (argo *ArgoController) validateIngress(ingress *v1beta1.Ingress) error {
+func (c *TunnelController) validateIngress(ingress *v1beta1.Ingress) error {
 	rules := ingress.Spec.Rules
 	if len(rules) == 0 {
 		return fmt.Errorf("Cannot create tunnel for ingress with no rules")
@@ -516,21 +518,21 @@ func (argo *ArgoController) validateIngress(ingress *v1beta1.Ingress) error {
 }
 
 // assumes validation
-func (argo *ArgoController) getServiceNameForIngress(ingress *v1beta1.Ingress) string {
+func (c *TunnelController) getServiceNameForIngress(ingress *v1beta1.Ingress) string {
 	return ingress.Spec.Rules[0].HTTP.Paths[0].Backend.ServiceName
 }
 
 // assumes validation
-func (argo *ArgoController) getServicePortForIngress(ingress *v1beta1.Ingress) intstr.IntOrString {
+func (c *TunnelController) getServicePortForIngress(ingress *v1beta1.Ingress) intstr.IntOrString {
 	return ingress.Spec.Rules[0].HTTP.Paths[0].Backend.ServicePort
 }
 
 // assumes validation
-func (argo *ArgoController) getHostNameForIngress(ingress *v1beta1.Ingress) string {
+func (c *TunnelController) getHostNameForIngress(ingress *v1beta1.Ingress) string {
 	return ingress.Spec.Rules[0].Host
 }
 
-func (argo *ArgoController) readSecret(hostname string) (*v1.Secret, error) {
+func (c *TunnelController) readSecret(hostname string) (*v1.Secret, error) {
 
 	var certSecret *v1.Secret
 
@@ -538,7 +540,7 @@ func (argo *ArgoController) readSecret(hostname string) (*v1.Secret, error) {
 	// decrementing is overkill, because the only valid choice is one level down.
 	for i := range elements {
 		domain := strings.Join(elements[i:], ".")
-		certSecretList, err := argo.client.CoreV1().Secrets(argo.options.secretNamespace).List(
+		certSecretList, err := c.client.CoreV1().Secrets(c.options.secretNamespace).List(
 			meta_v1.ListOptions{
 				LabelSelector: SecretLabelDomain + "=" + domain,
 			},
@@ -553,8 +555,8 @@ func (argo *ArgoController) readSecret(hostname string) (*v1.Secret, error) {
 		}
 	}
 
-	glog.V(5).Infof("Secret not found for label %s, hostname %s, trying default name %s", SecretLabelDomain, hostname, argo.options.secretName)
-	certSecret, err := argo.client.CoreV1().Secrets(argo.options.secretNamespace).Get(argo.options.secretName, meta_v1.GetOptions{})
+	glog.V(5).Infof("Secret not found for label %s, hostname %s, trying default name %s", SecretLabelDomain, hostname, c.options.secretName)
+	certSecret, err := c.client.CoreV1().Secrets(c.options.secretNamespace).Get(c.options.secretName, meta_v1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -563,39 +565,39 @@ func (argo *ArgoController) readSecret(hostname string) (*v1.Secret, error) {
 }
 
 // obtains the origin cert for a particular hostname
-func (argo *ArgoController) readOriginCert(hostname string) ([]byte, error) {
+func (c *TunnelController) readOriginCert(hostname string) ([]byte, error) {
 	// in the future, we will have multiple secrets
 	// at present the mapping of hostname -> secretname is "*" -> "cloudflared-cert"
 
-	// certSecret, err := argo.client.CoreV1().Secrets(argo.namespace).Get(SecretName, meta_v1.GetOptions{})
-	certSecret, err := argo.readSecret(hostname)
+	// certSecret, err := c.client.CoreV1().Secrets(c.namespace).Get(SecretName, meta_v1.GetOptions{})
+	certSecret, err := c.readSecret(hostname)
 	if err != nil {
 		return []byte{}, err
 	}
 	certFileName := "cert.pem"
 	originCert := certSecret.Data[certFileName]
 	if len(originCert) == 0 {
-		return []byte{}, fmt.Errorf("Certificate data not found for host %s in secret %s/%s", hostname, argo.options.secretName, certFileName)
+		return []byte{}, fmt.Errorf("Certificate data not found for host %s in secret %s/%s", hostname, c.options.secretName, certFileName)
 	}
 	return originCert, nil
 }
 
 // creates a tunnel and stores a reference to it by serviceName
-func (argo *ArgoController) createTunnel(key string, ingress *v1beta1.Ingress) error {
-	err := argo.validateIngress(ingress)
+func (c *TunnelController) createTunnel(key string, ingress *v1beta1.Ingress) error {
+	err := c.validateIngress(ingress)
 	if err != nil {
 		return err
 	}
 	ingressName := ingress.GetName()
-	serviceName := argo.getServiceNameForIngress(ingress)
+	serviceName := c.getServiceNameForIngress(ingress)
 	// key := fmt.Sprintf("%s/%s", ingress.ObjectMeta.Namespace, serviceName)
 	glog.V(5).Infof("creating tunnel for ingress %s, %s", ingressName, key)
 
-	servicePort := argo.getServicePortForIngress(ingress)
-	hostName := argo.getHostNameForIngress(ingress)
+	servicePort := c.getServicePortForIngress(ingress)
+	hostName := c.getHostNameForIngress(ingress)
 	lbPool, _ := parseIngressLoadBalancer(ingress)
 
-	originCert, err := argo.readOriginCert(hostName)
+	originCert, err := c.readOriginCert(hostName)
 	if err != nil {
 		return err
 	}
@@ -608,49 +610,49 @@ func (argo *ArgoController) createTunnel(key string, ingress *v1beta1.Ingress) e
 		ExternalHostname: hostName,
 		LBPool:           lbPool,
 		OriginCert:       originCert,
-		Version:          argo.options.version,
+		Version:          c.options.version,
 	}
 
-	tunnel, err := tunnel.NewArgoTunnelManager(config, argo.metricsConfig)
+	tunnel, err := tunnel.NewArgoTunnel(config, c.metricsConfig)
 	if err != nil {
 		return err
 	}
-	argo.tunnels.Store(key, tunnel)
+	c.tunnels.Store(key, tunnel)
 	glog.V(5).Infof("created tunnel for ingress %s,  %s", ingressName, key)
 
-	return argo.evaluateTunnelStatus(key)
+	return c.evaluateTunnelStatus(key)
 }
 
 // updates a tunnel and stores a reference to it by serviceName
-func (argo *ArgoController) updateTunnel(key string, ingress *v1beta1.Ingress) error {
-	err := argo.validateIngress(ingress)
+func (c *TunnelController) updateTunnel(key string, ingress *v1beta1.Ingress) error {
+	err := c.validateIngress(ingress)
 	if err != nil {
-		argo.removeTunnel(key)
+		c.removeTunnel(key)
 		return err
 	}
-	t, ok := argo.tunnels.Load(key)
+	t, ok := c.tunnels.Load(key)
 	if !ok {
-		return argo.createTunnel(key, ingress)
+		return c.createTunnel(key, ingress)
 	}
 
-	servicePort := argo.getServicePortForIngress(ingress)
-	serviceName := argo.getServiceNameForIngress(ingress)
-	hostName := argo.getHostNameForIngress(ingress)
+	servicePort := c.getServicePortForIngress(ingress)
+	serviceName := c.getServiceNameForIngress(ingress)
+	hostName := c.getHostNameForIngress(ingress)
 	lbPool, _ := parseIngressLoadBalancer(ingress)
 
 	config := t.Config()
 	if config.LBPool != lbPool || config.ExternalHostname != hostName || config.ServicePort != servicePort || config.ServiceName != serviceName {
 		glog.V(2).Infof("Ingress parameters have changed, recreating tunnel for %s", key)
-		argo.removeTunnel(key)
-		return argo.createTunnel(key, ingress)
+		c.removeTunnel(key)
+		return c.createTunnel(key, ingress)
 	}
 	return nil
 }
 
 // starts or stops the tunnel depending on the existence of
 // the associated service and endpoints
-func (argo *ArgoController) evaluateTunnelStatus(key string) error {
-	t, ok := argo.tunnels.Load(key)
+func (c *TunnelController) evaluateTunnelStatus(key string) error {
+	t, ok := c.tunnels.Load(key)
 	if !ok {
 		return fmt.Errorf("Tunnel not found for key %s", key)
 	}
@@ -658,16 +660,16 @@ func (argo *ArgoController) evaluateTunnelStatus(key string) error {
 	serviceName := t.Config().ServiceName
 	namespace := t.Config().ServiceNamespace
 
-	service, err := argo.serviceLister.Services(namespace).Get(serviceName)
+	service, err := c.serviceLister.Services(namespace).Get(serviceName)
 	if service == nil || err != nil {
 		glog.V(2).Infof("Service %s not found for tunnel", key)
-		return argo.stopTunnel(t)
+		return c.stopTunnel(t)
 	}
 
-	endpoints, err := argo.endpointsLister.Endpoints(namespace).Get(serviceName)
+	endpoints, err := c.endpointsLister.Endpoints(namespace).Get(serviceName)
 	if err != nil || endpoints == nil {
 		glog.V(2).Infof("Endpoints not found for tunnel %s", key)
-		return argo.stopTunnel(t)
+		return c.stopTunnel(t)
 	}
 	readyEndpointCount := 0
 	for _, subset := range endpoints.Subsets {
@@ -675,18 +677,18 @@ func (argo *ArgoController) evaluateTunnelStatus(key string) error {
 	}
 	if readyEndpointCount == 0 {
 		glog.V(2).Infof("Endpoints not ready for tunnel %s", key)
-		return argo.stopTunnel(t)
+		return c.stopTunnel(t)
 	}
 
 	glog.V(5).Infof("Validation ok for running %s with %d endpoint(s)", key, readyEndpointCount)
 	if !t.Active() {
-		return argo.startTunnel(t, service)
+		return c.startTunnel(t, service)
 	}
 
 	return nil
 }
 
-func (argo *ArgoController) startTunnel(t tunnel.Tunnel, service *v1.Service) error {
+func (c *TunnelController) startTunnel(t tunnel.Tunnel, service *v1.Service) error {
 
 	var port int32
 	ingressServicePort := t.Config().ServicePort
@@ -708,13 +710,13 @@ func (argo *ArgoController) startTunnel(t tunnel.Tunnel, service *v1.Service) er
 	if err != nil {
 		return err
 	}
-	return argo.setIngressEndpoint(t, t.Config().ExternalHostname)
+	return c.setIngressEndpoint(t, t.Config().ExternalHostname)
 }
 
-func (argo *ArgoController) setIngressEndpoint(t tunnel.Tunnel, hostname string) error {
+func (c *TunnelController) setIngressEndpoint(t tunnel.Tunnel, hostname string) error {
 	namespace := t.Config().ServiceNamespace
 	ingressName := t.Config().IngressName
-	ingressClient := argo.client.ExtensionsV1beta1().Ingresses(namespace)
+	ingressClient := c.client.ExtensionsV1beta1().Ingresses(namespace)
 	currentIngress, err := ingressClient.Get(ingressName, meta_v1.GetOptions{})
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("cannot find ingress %v/%v", namespace, ingressName))
@@ -743,34 +745,34 @@ func (argo *ArgoController) setIngressEndpoint(t tunnel.Tunnel, hostname string)
 	return err
 }
 
-func (argo *ArgoController) stopTunnel(t tunnel.Tunnel) error {
+func (c *TunnelController) stopTunnel(t tunnel.Tunnel) error {
 	if t.Active() {
 		err := t.Stop()
 		if err != nil {
 			glog.V(2).Infof("Error stopping tunnel, %v", err)
 			return err
 		}
-		return argo.setIngressEndpoint(t, "")
+		return c.setIngressEndpoint(t, "")
 	}
 	return nil
 }
 
-func (argo *ArgoController) removeTunnel(key string) error {
+func (c *TunnelController) removeTunnel(key string) error {
 	glog.V(5).Infof("Removing tunnel %s", key)
-	t, ok := argo.tunnels.LoadAndDelete(key)
+	t, ok := c.tunnels.LoadAndDelete(key)
 	if !ok {
 		return fmt.Errorf("Tunnel not found for key %s", key)
 	}
 	// Issue: if stopping the tunnel errors, the reference to the object
 	// will be lost; but the tunnel may not have been detached and cleaned.
 	// (the issue is historic and being preserved)
-	return argo.stopTunnel(t)
+	return c.stopTunnel(t)
 }
 
-func (argo *ArgoController) tearDown() error {
+func (c *TunnelController) tearDown() error {
 	glog.V(5).Infof("Tearing down tunnels")
 	var wg wait.Group
-	argo.tunnels.Filter(func(k string, t tunnel.Tunnel) bool {
+	c.tunnels.Filter(func(k string, t tunnel.Tunnel) bool {
 		wg.Start(func() {
 			// Issue: use of teardown vs stop is suspect.
 			if err := t.TearDown(); err != nil {

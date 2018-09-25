@@ -21,10 +21,10 @@ func TestArgoTunnelConfig(t *testing.T) {
 
 	metricsConfig := NewMetrics()
 
-	mgr, err := NewArgoTunnelManager(config, metricsConfig)
+	mgr, err := NewArgoTunnel(config, metricsConfig)
 	assert.Nil(t, err)
 
-	argot := mgr.(*ArgoTunnelManager)
+	argot := mgr.(*ArgoTunnel)
 	assert.NotNil(t, argot)
 
 	assert.Equal(t, argot.tunnelConfig.Hostname, config.ExternalHostname)

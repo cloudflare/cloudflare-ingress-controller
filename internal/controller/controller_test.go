@@ -231,7 +231,7 @@ func TestNewArgoController(t *testing.T) {
 	controllerNamespace := "cloudflare" // "cloudflare"
 	fakeClient := &fake.Clientset{}
 
-	wc := NewArgoController(fakeClient,
+	wc := NewTunnelController(fakeClient,
 		SecretNamespace("cloudflare"),
 	)
 
@@ -321,7 +321,7 @@ func TestControllerLookups(t *testing.T) {
 	serviceNamespace := "acme"
 	items := getTunnelItems(serviceNamespace)
 
-	wc := NewArgoController(fakeClient,
+	wc := NewTunnelController(fakeClient,
 		SecretNamespace("cloudflare"),
 	)
 
@@ -364,7 +364,7 @@ func TestTunnelInitialization(t *testing.T) {
 	fakeClient.Fake.AddWatchReactor("ingresses", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 	fakeClient.Fake.AddWatchReactor("ingresses", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 
-	wc := NewArgoController(fakeClient,
+	wc := NewTunnelController(fakeClient,
 		SecretNamespace("cloudflare"),
 	)
 
@@ -424,7 +424,7 @@ func TestTunnelServiceInitialization(t *testing.T) {
 
 	fakeClient.Fake.AddWatchReactor("*", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 
-	wc := NewArgoController(fakeClient,
+	wc := NewTunnelController(fakeClient,
 		SecretNamespace("cloudflare"),
 	)
 
@@ -513,7 +513,7 @@ func TestTunnelServicesTwoNS(t *testing.T) {
 
 	fakeClient.Fake.AddWatchReactor("*", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 
-	wc := NewArgoController(fakeClient,
+	wc := NewTunnelController(fakeClient,
 		SecretNamespace("cloudflare"),
 	)
 
@@ -538,7 +538,7 @@ func TestTunnelServicesTwoNS(t *testing.T) {
 	_, _ = fakeClient.Invokes(getServiceAction, &v1.Service{})
 
 	wait.Poll(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
-		done = wc.tunnels.Len() > 0
+		done = wc.tunnels.Len() > 1
 		return
 	})
 

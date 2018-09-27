@@ -538,7 +538,7 @@ func TestTunnelServicesTwoNS(t *testing.T) {
 	_, _ = fakeClient.Invokes(getServiceAction, &v1.Service{})
 
 	wait.Poll(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
-		done = wc.tunnels.Len() > 0
+		done = wc.tunnels.Len() > 1
 		return
 	})
 

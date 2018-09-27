@@ -8,7 +8,10 @@ controller:
   ingressClass: argo-tunnel
   logLevel: 2
   replicaCount: 1
-
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
 # Enable load balancing
 # requires load balancing enabled on the cloudflare account.
 loadBalancing:

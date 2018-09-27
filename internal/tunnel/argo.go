@@ -57,10 +57,10 @@ func newHttpTransport() *http.Transport {
 }
 
 // NewArgoTunnel is a wrapper around a argo tunnel running in a goroutine
-func NewArgoTunnel(config *Config, metricsSetup *MetricsConfig) (Tunnel, error) {
+func NewArgoTunnel(config *Config) (Tunnel, error) {
 	protocolLogger := log.New()
 
-	source := config.ServiceNamespace + "/" + config.ServiceName + ":" + config.ServicePort.String()
+	source := config.ServiceNamespace + "/" + config.ServiceName + "/" + config.ServicePort.String()
 	tunnelLogger := log.WithFields(log.Fields{
 		"origin":   source,
 		"hostname": config.ExternalHostname,
@@ -89,8 +89,8 @@ func NewArgoTunnel(config *Config, metricsSetup *MetricsConfig) (Tunnel, error) 
 		Tags:              []tunnelpogs.Tag{},
 		HAConnections:     haConnectionsDefault,
 		HTTPTransport:     httpTransport,
-		Metrics:           metricsSetup.Metrics,
-		MetricsUpdateFreq: metricsSetup.UpdateFrequency,
+		Metrics:           metricsConfig.metrics,
+		MetricsUpdateFreq: metricsConfig.updateFrequency,
 		ProtocolLogger:    protocolLogger,
 		Logger:            tunnelLogger,
 		IsAutoupdated:     false,

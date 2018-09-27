@@ -18,7 +18,6 @@ const (
 )
 
 type options struct {
-	enableMetrics   bool
 	ingressClass    string
 	secretNamespace string
 	secretName      string
@@ -27,13 +26,6 @@ type options struct {
 
 // Option provides behavior overrides
 type Option func(*options)
-
-// EnableMetrics enables tunnel metrics
-func EnableMetrics(b bool) Option {
-	return func(o *options) {
-		o.enableMetrics = b
-	}
-}
 
 // IngressClass defines the ingress class for the controller
 func IngressClass(s string) Option {

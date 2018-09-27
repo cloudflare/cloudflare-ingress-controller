@@ -8,8 +8,10 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/cloudflare/cloudflare-ingress-controller/internal/controller"
+	"github.com/cloudflare/cloudflare-ingress-controller/internal/tunnel"
 	"github.com/golang/glog"
 	"github.com/oklog/run"
 	"k8s.io/client-go/kubernetes"
@@ -59,9 +61,9 @@ func main() {
 		})
 	}
 	{
+		tunnel.EnableMetrics(5 * time.Second)
 		ctx, cancel := context.WithCancel(context.Background())
 		argo := controller.NewTunnelController(kclient,
-			controller.EnableMetrics(true),
 			controller.IngressClass(*ingressClass),
 			controller.SecretNamespace(*namespace),
 			controller.Version(version),

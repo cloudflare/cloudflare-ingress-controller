@@ -24,8 +24,8 @@ const (
 	repairJitter         = 1.0
 )
 
-// ArgoTunnelManager manages a single tunnel in a goroutine
-type ArgoTunnelManager struct {
+// ArgoTunnel manages a single tunnel in a goroutine
+type ArgoTunnel struct {
 	id           string
 	origin       string
 	config       *Config
@@ -56,8 +56,8 @@ func newHttpTransport() *http.Transport {
 	return httpTransport
 }
 
-// NewArgoTunnelManager is a wrapper around a argo tunnel running in a goroutine
-func NewArgoTunnelManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, error) {
+// NewArgoTunnel is a wrapper around a argo tunnel running in a goroutine
+func NewArgoTunnel(config *Config, metricsSetup *MetricsConfig) (Tunnel, error) {
 	protocolLogger := log.New()
 
 	source := config.ServiceNamespace + "/" + config.ServiceName + ":" + config.ServicePort.String()
@@ -99,7 +99,7 @@ func NewArgoTunnelManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, 
 
 	}
 
-	mgr := ArgoTunnelManager{
+	mgr := ArgoTunnel{
 		id:           utilrand.String(8),
 		origin:       source,
 		config:       config,
@@ -111,17 +111,17 @@ func NewArgoTunnelManager(config *Config, metricsSetup *MetricsConfig) (Tunnel, 
 	return &mgr, nil
 }
 
-func (mgr *ArgoTunnelManager) Config() Config {
+func (mgr *ArgoTunnel) Config() Config {
 	return *mgr.config
 }
 
-func (mgr *ArgoTunnelManager) Active() bool {
+func (mgr *ArgoTunnel) Active() bool {
 	mgr.mu.RLock()
 	defer mgr.mu.RUnlock()
 	return mgr.stopCh != nil
 }
 
-func (mgr *ArgoTunnelManager) Start(serviceURL string) error {
+func (mgr *ArgoTunnel) Start(serviceURL string) error {
 	if serviceURL == "" {
 		return fmt.Errorf("Cannot start tunnel for %s with empty url", mgr.Config().ServiceName)
 	} else if mgr.stopCh != nil {
@@ -142,7 +142,7 @@ func (mgr *ArgoTunnelManager) Start(serviceURL string) error {
 	return nil
 }
 
-func (mgr *ArgoTunnelManager) Stop() error {
+func (mgr *ArgoTunnel) Stop() error {
 	if mgr.stopCh == nil {
 		return fmt.Errorf("tunnel %s (%s) already stopped", mgr.origin, mgr.id)
 	}
@@ -161,11 +161,11 @@ func (mgr *ArgoTunnelManager) Stop() error {
 	return nil
 }
 
-func (mgr *ArgoTunnelManager) TearDown() error {
+func (mgr *ArgoTunnel) TearDown() error {
 	return mgr.Stop()
 }
 
-func (mgr *ArgoTunnelManager) CheckStatus() error {
+func (mgr *ArgoTunnel) CheckStatus() error {
 	return fmt.Errorf("Not implemented")
 }
 

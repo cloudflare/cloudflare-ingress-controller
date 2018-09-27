@@ -60,7 +60,7 @@ func main() {
 	}
 	{
 		ctx, cancel := context.WithCancel(context.Background())
-		argo := controller.NewArgoController(kclient,
+		argo := controller.NewTunnelController(kclient,
 			controller.EnableMetrics(true),
 			controller.IngressClass(*ingressClass),
 			controller.SecretNamespace(*namespace),

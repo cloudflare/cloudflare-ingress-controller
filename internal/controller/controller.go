@@ -463,19 +463,19 @@ func (c *TunnelController) processService(queueKey string) error {
 		return nil
 	}
 
-	var errorMessage string
+	var msg string
 	for _, key := range keys {
 		err := c.evaluateTunnelStatus(key)
 		if err != nil {
-			if errorMessage == "" {
-				errorMessage = err.Error()
+			if msg == "" {
+				msg = err.Error()
 			} else {
-				errorMessage = errorMessage + "; " + err.Error()
+				msg = msg + "; " + err.Error()
 			}
 		}
 	}
-	if errorMessage != "" {
-		return fmt.Errorf("at least one error occurred handling %s: %s", queueKey, errorMessage)
+	if msg != "" {
+		return fmt.Errorf("at least one error occurred handling %s: %s", queueKey, msg)
 	}
 	return nil
 

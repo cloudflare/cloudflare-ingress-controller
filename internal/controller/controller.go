@@ -30,8 +30,6 @@ type TunnelController struct {
 	client  kubernetes.Interface
 	options options
 
-	metricsConfig *tunnel.MetricsConfig
-
 	ingressLister    lister_v1beta1.IngressLister
 	ingressInformer  cache.Controller
 	ingressWorkqueue workqueue.RateLimitingInterface
@@ -52,9 +50,8 @@ func NewTunnelController(client kubernetes.Interface, options ...Option) *Tunnel
 	informer, indexer, queue := createIngressInformer(client, opts.ingressClass)
 
 	c := &TunnelController{
-		client:        client,
-		options:       opts,
-		metricsConfig: tunnel.NewDummyMetrics(),
+		client:  client,
+		options: opts,
 
 		ingressInformer:  informer,
 		ingressWorkqueue: queue,
@@ -62,10 +59,6 @@ func NewTunnelController(client kubernetes.Interface, options ...Option) *Tunnel
 	}
 	c.configureServiceInformer()
 	c.configureEndpointInformer()
-
-	if opts.enableMetrics {
-		c.metricsConfig = tunnel.NewMetrics()
-	}
 	return c
 }
 
@@ -613,7 +606,7 @@ func (c *TunnelController) createTunnel(key string, ingress *v1beta1.Ingress) er
 		Version:          c.options.version,
 	}
 
-	tunnel, err := tunnel.NewArgoTunnel(config, c.metricsConfig)
+	tunnel, err := tunnel.NewArgoTunnel(config)
 	if err != nil {
 		return err
 	}

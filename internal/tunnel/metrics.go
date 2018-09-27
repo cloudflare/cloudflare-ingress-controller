@@ -1,34 +1,27 @@
 package tunnel
 
 import (
+	"sync"
 	"time"
 
 	"github.com/cloudflare/cloudflared/origin"
 )
 
-// MetricsConfig wraps the argo tunnel metrics in a struct
-type MetricsConfig struct {
-	Metrics         *origin.TunnelMetrics
-	UpdateFrequency time.Duration
+// todo: Review the metrics pattern used by cloudflared and
+// migrate towards go-kit metrics with configurable providers.
+var metricsConfig = struct {
+	metrics         *origin.TunnelMetrics
+	updateFrequency time.Duration
+	setMetrics      sync.Once
+}{
+	metrics:         &origin.TunnelMetrics{},
+	updateFrequency: 10000 * time.Hour,
 }
 
-// NewMetrics created a set of TunnelMetrics,
-// allows global prometheus objects, which breaks tests
-func NewMetrics() *MetricsConfig {
-
-	return &MetricsConfig{
-		Metrics:         origin.NewTunnelMetrics(),
-		UpdateFrequency: 5 * time.Second,
-	}
-}
-
-// NewDummyMetrics creates a sample TunnelMetrics object
-// full of default zero values
-// does not initializs prometheus and is acceptable for tests
-func NewDummyMetrics() *MetricsConfig {
-
-	return &MetricsConfig{
-		Metrics:         &origin.TunnelMetrics{},
-		UpdateFrequency: 10000 * time.Hour,
-	}
+// EnableMetrics configures the metrics used by all tunnels
+func EnableMetrics(updateFrequency time.Duration) {
+	metricsConfig.setMetrics.Do(func() {
+		metricsConfig.metrics = origin.NewTunnelMetrics()
+		metricsConfig.updateFrequency = updateFrequency
+	})
 }

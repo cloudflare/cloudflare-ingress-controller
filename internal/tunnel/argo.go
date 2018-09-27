@@ -19,16 +19,16 @@ import (
 )
 
 const (
-	haConnectionsDefault = 4
-	repairDelay          = 50 * time.Millisecond
-	repairJitter         = 1.0
+	repairDelay  = 50 * time.Millisecond
+	repairJitter = 1.0
 )
 
 // ArgoTunnel manages a single tunnel in a goroutine
 type ArgoTunnel struct {
 	id           string
 	origin       string
-	config       *Config
+	route        Route
+	options      Options
 	tunnelConfig *origin.TunnelConfig
 	errCh        chan error
 	stopCh       chan struct{}
@@ -57,13 +57,14 @@ func newHttpTransport() *http.Transport {
 }
 
 // NewArgoTunnel is a wrapper around a argo tunnel running in a goroutine
-func NewArgoTunnel(config *Config) (Tunnel, error) {
+func NewArgoTunnel(route Route, options ...Option) (Tunnel, error) {
+	opts := CollectOptions(options)
 	protocolLogger := log.New()
 
-	source := config.ServiceNamespace + "/" + config.ServiceName + "/" + config.ServicePort.String()
+	source := route.Namespace + "/" + route.ServiceName + "/" + route.ServicePort.String()
 	tunnelLogger := log.WithFields(log.Fields{
 		"origin":   source,
-		"hostname": config.ExternalHostname,
+		"hostname": route.ExternalHostname,
 	}).Logger
 
 	httpTransport := newHttpTransport()
@@ -73,36 +74,38 @@ func NewArgoTunnel(config *Config) (Tunnel, error) {
 	}
 
 	tunnelConfig := origin.TunnelConfig{
-		EdgeAddrs:         []string{}, // load default values later, see github.com/cloudflare/cloudflared/blob/master/origin/discovery.go#
-		OriginUrl:         "",
-		Hostname:          config.ExternalHostname,
-		OriginCert:        config.OriginCert, // []byte{}
-		TlsConfig:         tlsConfig,
-		ClientTlsConfig:   httpTransport.TLSClientConfig, // *tls.Config
-		Retries:           5,
-		HeartbeatInterval: 5 * time.Second,
-		MaxHeartbeats:     5,
-		ClientID:          utilrand.String(16),
-		BuildInfo:         origin.GetBuildInfo(),
-		ReportedVersion:   config.Version,
-		LBPool:            config.LBPool,
-		Tags:              []tunnelpogs.Tag{},
-		HAConnections:     haConnectionsDefault,
-		HTTPTransport:     httpTransport,
-		Metrics:           metricsConfig.metrics,
-		MetricsUpdateFreq: metricsConfig.updateFrequency,
-		ProtocolLogger:    protocolLogger,
-		Logger:            tunnelLogger,
-		IsAutoupdated:     false,
-		GracePeriod:       0,     //time.Duration
-		RunFromTerminal:   false, // bool
-
+		EdgeAddrs:          []string{}, // load default values later, see github.com/cloudflare/cloudflared/blob/master/origin/discovery.go#
+		OriginUrl:          "",
+		Hostname:           route.ExternalHostname,
+		OriginCert:         route.OriginCert, // []byte{}
+		TlsConfig:          tlsConfig,
+		ClientTlsConfig:    httpTransport.TLSClientConfig, // *tls.Config
+		Retries:            opts.Retries,
+		HeartbeatInterval:  opts.HeartbeatInterval,
+		MaxHeartbeats:      opts.HeartbeatCount,
+		ClientID:           utilrand.String(16),
+		BuildInfo:          origin.GetBuildInfo(),
+		ReportedVersion:    route.Version,
+		LBPool:             opts.LbPool,
+		Tags:               []tunnelpogs.Tag{},
+		HAConnections:      opts.HaConnections,
+		HTTPTransport:      httpTransport,
+		Metrics:            metricsConfig.metrics,
+		MetricsUpdateFreq:  metricsConfig.updateFrequency,
+		ProtocolLogger:     protocolLogger,
+		Logger:             tunnelLogger,
+		IsAutoupdated:      false,
+		GracePeriod:        opts.GracePeriod,
+		RunFromTerminal:    false, // bool
+		NoChunkedEncoding:  opts.NoChunkedEncoding,
+		CompressionQuality: opts.CompressionQuality,
 	}
 
 	t := ArgoTunnel{
 		id:           utilrand.String(8),
 		origin:       source,
-		config:       config,
+		route:        route,
+		options:      opts,
 		tunnelConfig: &tunnelConfig,
 		errCh:        make(chan error),
 		stopCh:       nil,
@@ -111,19 +114,27 @@ func NewArgoTunnel(config *Config) (Tunnel, error) {
 	return &t, nil
 }
 
-func (t *ArgoTunnel) Config() Config {
-	return *t.config
+// Route returns the tunnel configuration
+func (t *ArgoTunnel) Route() Route {
+	return t.route
 }
 
+// Options returns the tunnel options
+func (t *ArgoTunnel) Options() Options {
+	return t.options
+}
+
+// Active tells whether the tunnel is active or not
 func (t *ArgoTunnel) Active() bool {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return t.stopCh != nil
 }
 
+// Start the tunnel to connect to a particular service url, making it active
 func (t *ArgoTunnel) Start(serviceURL string) error {
 	if serviceURL == "" {
-		return fmt.Errorf("Cannot start tunnel for %s with empty url", t.config.ServiceName)
+		return fmt.Errorf("Cannot start tunnel for %s with empty url", t.route.ServiceName)
 	} else if t.stopCh != nil {
 		return nil
 	}
@@ -142,6 +153,7 @@ func (t *ArgoTunnel) Start(serviceURL string) error {
 	return nil
 }
 
+// Stop the tunnel, making it inactive
 func (t *ArgoTunnel) Stop() error {
 	if t.stopCh == nil {
 		return fmt.Errorf("tunnel %s (%s) already stopped", t.origin, t.id)
@@ -161,10 +173,12 @@ func (t *ArgoTunnel) Stop() error {
 	return nil
 }
 
+// TearDown cleans up all external resources
 func (t *ArgoTunnel) TearDown() error {
 	return t.Stop()
 }
 
+// CheckStatus validates the current state of the tunnel
 func (t *ArgoTunnel) CheckStatus() error {
 	return fmt.Errorf("Not implemented")
 }
@@ -172,9 +186,9 @@ func (t *ArgoTunnel) CheckStatus() error {
 func launchFunc(a *ArgoTunnel) func() {
 	errCh := a.errCh
 	stopCh := a.stopCh
-	config := a.tunnelConfig
+	route := a.tunnelConfig
 	return func() {
-		errCh <- origin.StartTunnelDaemon(config, stopCh, make(chan struct{}))
+		errCh <- origin.StartTunnelDaemon(route, stopCh, make(chan struct{}))
 	}
 }
 
@@ -183,7 +197,7 @@ func repairFunc(a *ArgoTunnel) func() {
 	errCh := a.errCh
 	quitCh := a.quitCh
 	origin := a.origin
-	config := a.config
+	route := a.route
 	logger := a.tunnelConfig.Logger
 	return func() {
 		for {
@@ -198,21 +212,21 @@ func repairFunc(a *ArgoTunnel) func() {
 					func() {
 						logger.WithFields(log.Fields{
 							"origin":   origin,
-							"hostname": config.ExternalHostname,
+							"hostname": route.ExternalHostname,
 						}).Errorf("tunnel exited with error (%s) '%v', repairing ...", reflect.TypeOf(err), err)
 
 						// linear back-off on runtime error
 						delay := wait.Jitter(repairDelay, repairJitter)
 						logger.WithFields(log.Fields{
 							"origin":   origin,
-							"hostname": config.ExternalHostname,
+							"hostname": route.ExternalHostname,
 						}).Infof("tunnel repair starts in %v", delay)
 
 						select {
 						case <-quitCh:
 							logger.WithFields(log.Fields{
 								"origin":   origin,
-								"hostname": config.ExternalHostname,
+								"hostname": route.ExternalHostname,
 							}).Infof("tunnel repair canceled, stop detected.")
 							return
 						case <-time.After(delay):
@@ -221,7 +235,7 @@ func repairFunc(a *ArgoTunnel) func() {
 						if t.stopCh == nil {
 							logger.WithFields(log.Fields{
 								"origin":   origin,
-								"hostname": config.ExternalHostname,
+								"hostname": route.ExternalHostname,
 							}).Infof("tunnel repair canceled, stop detected.")
 							return
 						}
@@ -231,7 +245,7 @@ func repairFunc(a *ArgoTunnel) func() {
 						if t.stopCh == nil {
 							logger.WithFields(log.Fields{
 								"origin":   origin,
-								"hostname": config.ExternalHostname,
+								"hostname": route.ExternalHostname,
 							}).Infof("tunnel repair canceled, stop detected.")
 							return
 						}

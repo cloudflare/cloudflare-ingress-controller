@@ -12,7 +12,7 @@ PLATFORMS := \
 	# arm32v6-linux-arm-6
 	# arm32v6-linux-arm-7
 	# x86, consider supporting 32bit
-	# i386-lunix-386
+	# i386-linux-386
 	# QEMU issue, exec failure on apk add
 	# s390x-linux-s390x
 

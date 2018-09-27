@@ -8,35 +8,34 @@ import (
 )
 
 func TestArgoTunnelConfig(t *testing.T) {
-
-	config := &Config{
-		ServiceName:      "service",
-		ServiceNamespace: "default",
+	route := Route{
+		ServiceName:      "acme",
 		ServicePort:      intstr.FromInt(6000),
+		IngressName:      "acme",
+		Namespace:        "default",
 		ExternalHostname: "acme.example.com",
-		LBPool:           "abc123",
 		OriginCert:       []byte("this is not a cert"),
 		Version:          "test",
 	}
 
-	tunnel, err := NewArgoTunnel(config)
+	tunnel, err := NewArgoTunnel(route)
 	assert.Nil(t, err)
 
 	argot := tunnel.(*ArgoTunnel)
 	assert.NotNil(t, argot)
 
-	assert.Equal(t, argot.tunnelConfig.Hostname, config.ExternalHostname)
-	assert.Equal(t, argot.tunnelConfig.LBPool, config.LBPool)
-	assert.Equal(t, argot.tunnelConfig.OriginCert, config.OriginCert)
+	assert.Equal(t, argot.tunnelConfig.Hostname, route.ExternalHostname)
+	assert.Equal(t, argot.tunnelConfig.OriginCert, route.OriginCert)
 
-	assert.Equal(t, argot.tunnelConfig.HAConnections, haConnectionsDefault)
+	assert.Equal(t, argot.tunnelConfig.HAConnections, HaConnectionsDefault)
+	assert.Equal(t, argot.tunnelConfig.Retries, RetriesDefault)
 	assert.NotNil(t, argot.tunnelConfig.ProtocolLogger)
 
-	assert.Equal(t, argot.config.ServiceName, config.ServiceName)
-	assert.Equal(t, argot.config.ServicePort, config.ServicePort)
+	assert.Equal(t, argot.route.ServiceName, route.ServiceName)
+	assert.Equal(t, argot.route.ServicePort, route.ServicePort)
 
 	// TODO write a test for the post-start condition where the origin url and port have been determined
-	//assert.Equal(t, fmt.Sprintf("%s.%s:%d", config.ServiceName, config.ServiceNamespace, config.ServicePort.IntValue()), argot.tunnelConfig.OriginUrl)
+	//assert.Equal(t, fmt.Sprintf("%s.%s:%d", config.ServiceName, config.Namespace, config.ServicePort.IntValue()), argot.tunnelConfig.OriginUrl)
 	assert.Equal(t, "", argot.tunnelConfig.OriginUrl)
 
 	assert.False(t, argot.Active())

@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudflare/cloudflare-ingress-controller/internal/tunnel"
+
 	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
@@ -327,10 +329,10 @@ func TestControllerLookups(t *testing.T) {
 
 	// broken for now
 	// assert.Equal(t, "fooservice", wc.getServiceNameForIngress(&items.Ingress))
-	lbpool, _ := parseIngressLoadBalancer(&items.Ingress)
+	opts := tunnel.CollectOptions(parseIngressTunnelOptions(&items.Ingress))
 	assert.Equal(t, "test.example.com", wc.getHostNameForIngress(&items.Ingress))
 	assert.Equal(t, int32(80), wc.getServicePortForIngress(&items.Ingress).IntVal)
-	assert.Equal(t, "testpool", lbpool)
+	assert.Equal(t, "testpool", opts.LbPool)
 	// assert.Equal(t, "test.example.com", wc.getLBPoolForIngress(&items.Ingress))
 }
 
@@ -391,9 +393,9 @@ func TestTunnelInitialization(t *testing.T) {
 		t.Fatalf("failing, tunnel is nil for %s", key)
 	}
 	assert.False(t, fooTunnel.Active())
-	assert.Equal(t, "test.example.com", fooTunnel.Config().ExternalHostname)
-	assert.Equal(t, "fooservice", fooTunnel.Config().ServiceName)
-	assert.Equal(t, int32(80), fooTunnel.Config().ServicePort.IntVal)
+	assert.Equal(t, "test.example.com", fooTunnel.Route().ExternalHostname)
+	assert.Equal(t, "fooservice", fooTunnel.Route().ServiceName)
+	assert.Equal(t, int32(80), fooTunnel.Route().ServicePort.IntVal)
 
 }
 
@@ -462,9 +464,9 @@ func TestTunnelServiceInitialization(t *testing.T) {
 		t.Fatalf("failing, tunnel is nil for %s", key)
 	}
 	assert.False(t, fooTunnel.Active())
-	assert.Equal(t, "test.example.com", fooTunnel.Config().ExternalHostname)
-	assert.Equal(t, "fooservice", fooTunnel.Config().ServiceName)
-	assert.Equal(t, int32(80), fooTunnel.Config().ServicePort.IntVal)
+	assert.Equal(t, "test.example.com", fooTunnel.Route().ExternalHostname)
+	assert.Equal(t, "fooservice", fooTunnel.Route().ServiceName)
+	assert.Equal(t, int32(80), fooTunnel.Route().ServicePort.IntVal)
 
 }
 
@@ -552,8 +554,8 @@ func TestTunnelServicesTwoNS(t *testing.T) {
 			t.Fatalf("failing, tunnel is nil for %s", key)
 		}
 		assert.False(t, tunnel.Active())
-		assert.Equal(t, "test.example.com", tunnel.Config().ExternalHostname)
-		assert.Equal(t, "fooservice", tunnel.Config().ServiceName)
-		assert.Equal(t, int32(80), tunnel.Config().ServicePort.IntVal)
+		assert.Equal(t, "test.example.com", tunnel.Route().ExternalHostname)
+		assert.Equal(t, "fooservice", tunnel.Route().ServiceName)
+		assert.Equal(t, int32(80), tunnel.Route().ServicePort.IntVal)
 	}
 }

@@ -8,9 +8,14 @@ type mockTunnel struct {
 	mock.Mock
 }
 
-func (t *mockTunnel) Config() Config {
+func (t *mockTunnel) Route() Route {
 	args := t.Called()
-	return args.Get(0).(Config)
+	return args.Get(0).(Route)
+}
+
+func (t *mockTunnel) Options() Options {
+	args := t.Called()
+	return args.Get(0).(Options)
 }
 
 func (t *mockTunnel) Start(serviceURL string) error {

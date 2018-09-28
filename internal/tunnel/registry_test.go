@@ -38,7 +38,7 @@ func TestLoad(t *testing.T) {
 			obj: map[string]Tunnel{
 				"test": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test",
 					})
 					return t
@@ -57,7 +57,7 @@ func TestLoad(t *testing.T) {
 		tag := func() (tag string) {
 			if r.obj != nil {
 				if t, ok := r.obj[test.key]; ok {
-					tag = t.Config().ServiceName
+					tag = t.Route().ServiceName
 				}
 			}
 			return
@@ -80,7 +80,7 @@ func TestStore(t *testing.T) {
 			key: "test",
 			val: func() Tunnel {
 				t := &mockTunnel{}
-				t.On("Config").Return(Config{
+				t.On("Route").Return(Route{
 					ServiceName: "test",
 				})
 				return t
@@ -91,7 +91,7 @@ func TestStore(t *testing.T) {
 			obj: map[string]Tunnel{
 				"test-a": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-a",
 					})
 					return t
@@ -100,7 +100,7 @@ func TestStore(t *testing.T) {
 			key: "test-b",
 			val: func() Tunnel {
 				t := &mockTunnel{}
-				t.On("Config").Return(Config{
+				t.On("Route").Return(Route{
 					ServiceName: "test-b",
 				})
 				return t
@@ -111,7 +111,7 @@ func TestStore(t *testing.T) {
 			obj: map[string]Tunnel{
 				"test": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-a",
 					})
 					return t
@@ -120,7 +120,7 @@ func TestStore(t *testing.T) {
 			key: "test",
 			val: func() Tunnel {
 				t := &mockTunnel{}
-				t.On("Config").Return(Config{
+				t.On("Route").Return(Route{
 					ServiceName: "test-b",
 				})
 				return t
@@ -160,7 +160,7 @@ func TestDelete(t *testing.T) {
 			obj: map[string]Tunnel{
 				"test-a": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-a",
 					})
 					return t
@@ -173,14 +173,14 @@ func TestDelete(t *testing.T) {
 			obj: map[string]Tunnel{
 				"test-a": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-a",
 					})
 					return t
 				}(),
 				"test-b": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-b",
 					})
 					return t
@@ -226,7 +226,7 @@ func TestLoadAndDelete(t *testing.T) {
 			obj: map[string]Tunnel{
 				"test-a": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-a",
 					})
 					return t
@@ -241,14 +241,14 @@ func TestLoadAndDelete(t *testing.T) {
 			obj: map[string]Tunnel{
 				"test-a": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-a",
 					})
 					return t
 				}(),
 				"test-b": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-b",
 					})
 					return t
@@ -267,7 +267,7 @@ func TestLoadAndDelete(t *testing.T) {
 		val, ok := r.LoadAndDelete(test.key)
 		tag := func() (tag string) {
 			if val != nil {
-				tag = val.Config().ServiceName
+				tag = val.Route().ServiceName
 			}
 			return
 		}()
@@ -300,21 +300,21 @@ func TestRange(t *testing.T) {
 			obj: map[string]Tunnel{
 				"test-a": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-a",
 					})
 					return t
 				}(),
 				"test-b": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-b",
 					})
 					return t
 				}(),
 				"test-c": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-c",
 					})
 					return t
@@ -327,21 +327,21 @@ func TestRange(t *testing.T) {
 			obj: map[string]Tunnel{
 				"test-a": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-a",
 					})
 					return t
 				}(),
 				"test-b": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-b",
 					})
 					return t
 				}(),
 				"test-c": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-c",
 					})
 					return t
@@ -381,21 +381,21 @@ func TestFilter(t *testing.T) {
 			obj: map[string]Tunnel{
 				"test-a": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-a",
 					})
 					return t
 				}(),
 				"test-b": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-b",
 					})
 					return t
 				}(),
 				"test-c": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-c",
 					})
 					return t
@@ -408,21 +408,21 @@ func TestFilter(t *testing.T) {
 			obj: map[string]Tunnel{
 				"test-a": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-a",
 					})
 					return t
 				}(),
 				"test-b": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-b",
 					})
 					return t
 				}(),
 				"test-c": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-c",
 					})
 					return t
@@ -435,21 +435,21 @@ func TestFilter(t *testing.T) {
 			obj: map[string]Tunnel{
 				"test-a": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-a",
 					})
 					return t
 				}(),
 				"test-b": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-b",
 					})
 					return t
 				}(),
 				"test-c": func() Tunnel {
 					t := &mockTunnel{}
-					t.On("Config").Return(Config{
+					t.On("Route").Return(Route{
 						ServiceName: "test-c",
 					})
 					return t

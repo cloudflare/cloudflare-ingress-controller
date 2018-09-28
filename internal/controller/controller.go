@@ -65,7 +65,7 @@ func NewTunnelController(client kubernetes.Interface, options ...Option) *Tunnel
 func (c *TunnelController) getTunnelsForService(namespace, name string) []string {
 	var keys []string
 	c.tunnels.Range(func(k string, t tunnel.Tunnel) bool {
-		if name == t.Config().ServiceName && namespace == t.Config().ServiceNamespace {
+		if name == t.Route().ServiceName && namespace == t.Route().Namespace {
 			keys = append(keys, k)
 		}
 		return true
@@ -213,7 +213,7 @@ func (c *TunnelController) isWatchedService(service *v1.Service) (ok bool) {
 
 	name, ns := svcMeta.GetName(), svcMeta.GetNamespace()
 	c.tunnels.Range(func(k string, t tunnel.Tunnel) bool {
-		if name == t.Config().ServiceName && ns == t.Config().ServiceNamespace {
+		if name == t.Route().ServiceName && ns == t.Route().Namespace {
 			glog.V(5).Infof("Watching service %s/%s", ns, name)
 			// set outer return and trigger stop condition
 			ok = true
@@ -282,7 +282,7 @@ func (c *TunnelController) isWatchedEndpoint(ep *v1.Endpoints) (ok bool) {
 
 	name, ns := epMeta.GetName(), epMeta.GetNamespace()
 	c.tunnels.Range(func(k string, t tunnel.Tunnel) bool {
-		if name == t.Config().ServiceName {
+		if name == t.Route().ServiceName {
 			glog.V(5).Infof("Watching endpoint %s/%s", ns, name)
 			// set outer return and trigger stop condition
 			ok = true
@@ -400,7 +400,7 @@ func (c *TunnelController) processIngress(queueKey string) error {
 
 		tunnel, ok := c.tunnels.Load(key)
 		if ok {
-			glog.V(5).Infof("Tunnel \"%s\" (%s) already exists", key, tunnel.Config().ExternalHostname)
+			glog.V(5).Infof("Tunnel \"%s\" (%s) already exists", key, tunnel.Route().ExternalHostname)
 			return nil
 		}
 
@@ -588,25 +588,24 @@ func (c *TunnelController) createTunnel(key string, ingress *v1beta1.Ingress) er
 
 	servicePort := c.getServicePortForIngress(ingress)
 	hostName := c.getHostNameForIngress(ingress)
-	lbPool, _ := parseIngressLoadBalancer(ingress)
+	options := parseIngressTunnelOptions(ingress)
 
 	originCert, err := c.readOriginCert(hostName)
 	if err != nil {
 		return err
 	}
 
-	config := &tunnel.Config{
+	route := tunnel.Route{
 		ServiceName:      serviceName,
-		ServiceNamespace: ingress.ObjectMeta.Namespace,
+		Namespace:        ingress.ObjectMeta.Namespace,
 		ServicePort:      servicePort,
 		IngressName:      ingress.ObjectMeta.Name,
 		ExternalHostname: hostName,
-		LBPool:           lbPool,
 		OriginCert:       originCert,
 		Version:          c.options.version,
 	}
 
-	tunnel, err := tunnel.NewArgoTunnel(config)
+	tunnel, err := tunnel.NewArgoTunnel(route, options...)
 	if err != nil {
 		return err
 	}
@@ -631,11 +630,17 @@ func (c *TunnelController) updateTunnel(key string, ingress *v1beta1.Ingress) er
 	servicePort := c.getServicePortForIngress(ingress)
 	serviceName := c.getServiceNameForIngress(ingress)
 	hostName := c.getHostNameForIngress(ingress)
-	lbPool, _ := parseIngressLoadBalancer(ingress)
 
-	config := t.Config()
-	if config.LBPool != lbPool || config.ExternalHostname != hostName || config.ServicePort != servicePort || config.ServiceName != serviceName {
-		glog.V(2).Infof("Ingress parameters have changed, recreating tunnel for %s", key)
+	r := t.Route()
+	if r.ExternalHostname != hostName || r.ServicePort != servicePort || r.ServiceName != serviceName {
+		glog.V(2).Infof("Ingress origin has changed, recreating tunnel for %s", key)
+		c.removeTunnel(key)
+		return c.createTunnel(key, ingress)
+	}
+
+	opts := tunnel.CollectOptions(parseIngressTunnelOptions(ingress))
+	if t.Options() != opts {
+		glog.V(2).Infof("Ingress tunnel options have changed, recreating tunnel for %s", key)
 		c.removeTunnel(key)
 		return c.createTunnel(key, ingress)
 	}
@@ -650,8 +655,8 @@ func (c *TunnelController) evaluateTunnelStatus(key string) error {
 		return fmt.Errorf("Tunnel not found for key %s", key)
 	}
 
-	serviceName := t.Config().ServiceName
-	namespace := t.Config().ServiceNamespace
+	serviceName := t.Route().ServiceName
+	namespace := t.Route().Namespace
 
 	service, err := c.serviceLister.Services(namespace).Get(serviceName)
 	if service == nil || err != nil {
@@ -684,7 +689,7 @@ func (c *TunnelController) evaluateTunnelStatus(key string) error {
 func (c *TunnelController) startTunnel(t tunnel.Tunnel, service *v1.Service) error {
 
 	var port int32
-	ingressServicePort := t.Config().ServicePort
+	ingressServicePort := t.Route().ServicePort
 	for _, p := range service.Spec.Ports {
 
 		// equality
@@ -703,12 +708,12 @@ func (c *TunnelController) startTunnel(t tunnel.Tunnel, service *v1.Service) err
 	if err != nil {
 		return err
 	}
-	return c.setIngressEndpoint(t, t.Config().ExternalHostname)
+	return c.setIngressEndpoint(t, t.Route().ExternalHostname)
 }
 
 func (c *TunnelController) setIngressEndpoint(t tunnel.Tunnel, hostname string) error {
-	namespace := t.Config().ServiceNamespace
-	ingressName := t.Config().IngressName
+	namespace := t.Route().Namespace
+	ingressName := t.Route().IngressName
 	ingressClient := c.client.ExtensionsV1beta1().Ingresses(namespace)
 	currentIngress, err := ingressClient.Get(ingressName, meta_v1.GetOptions{})
 	if err != nil {

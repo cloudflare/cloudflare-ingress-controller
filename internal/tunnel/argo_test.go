@@ -3,11 +3,13 @@ package tunnel
 import (
 	"testing"
 
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func TestArgoTunnelConfig(t *testing.T) {
+	logger, hook := test.NewNullLogger()
 	route := Route{
 		ServiceName:      "acme",
 		ServicePort:      intstr.FromInt(6000),
@@ -18,7 +20,7 @@ func TestArgoTunnelConfig(t *testing.T) {
 		Version:          "test",
 	}
 
-	tunnel, err := NewArgoTunnel(route)
+	tunnel, err := NewArgoTunnel(route, logger)
 	assert.Nil(t, err)
 
 	argot := tunnel.(*ArgoTunnel)
@@ -37,6 +39,8 @@ func TestArgoTunnelConfig(t *testing.T) {
 	// TODO write a test for the post-start condition where the origin url and port have been determined
 	//assert.Equal(t, fmt.Sprintf("%s.%s:%d", config.ServiceName, config.Namespace, config.ServicePort.IntValue()), argot.tunnelConfig.OriginUrl)
 	assert.Equal(t, "", argot.tunnelConfig.OriginUrl)
-
 	assert.False(t, argot.Active())
+
+	hook.Reset()
+	assert.Nil(t, hook.LastEntry())
 }

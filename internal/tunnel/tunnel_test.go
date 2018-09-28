@@ -8,6 +8,11 @@ type mockTunnel struct {
 	mock.Mock
 }
 
+func (t *mockTunnel) Origin() string {
+	args := t.Called()
+	return args.Get(0).(string)
+}
+
 func (t *mockTunnel) Route() Route {
 	args := t.Called()
 	return args.Get(0).(Route)

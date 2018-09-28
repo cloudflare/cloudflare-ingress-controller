@@ -15,7 +15,7 @@ import (
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -30,6 +30,7 @@ type ArgoTunnel struct {
 	route        Route
 	options      Options
 	tunnelConfig *origin.TunnelConfig
+	log          *logrus.Logger
 	errCh        chan error
 	stopCh       chan struct{}
 	quitCh       chan struct{}
@@ -57,12 +58,14 @@ func newHttpTransport() *http.Transport {
 }
 
 // NewArgoTunnel is a wrapper around a argo tunnel running in a goroutine
-func NewArgoTunnel(route Route, options ...Option) (Tunnel, error) {
+func NewArgoTunnel(route Route, log *logrus.Logger, options ...Option) (Tunnel, error) {
 	opts := CollectOptions(options)
-	protocolLogger := log.New()
+
+	// new logger to void sharing log-level (very noisy at debug)
+	protocolLogger := logrus.New()
 
 	source := route.Namespace + "/" + route.ServiceName + "/" + route.ServicePort.String()
-	tunnelLogger := log.WithFields(log.Fields{
+	tunnelLogger := logrus.StandardLogger().WithFields(logrus.Fields{
 		"origin":   source,
 		"hostname": route.ExternalHostname,
 	}).Logger
@@ -107,11 +110,17 @@ func NewArgoTunnel(route Route, options ...Option) (Tunnel, error) {
 		route:        route,
 		options:      opts,
 		tunnelConfig: &tunnelConfig,
+		log:          log,
 		errCh:        make(chan error),
 		stopCh:       nil,
 		quitCh:       nil,
 	}
 	return &t, nil
+}
+
+// Origin returns the tunnel origin
+func (t *ArgoTunnel) Origin() string {
+	return t.origin
 }
 
 // Route returns the tunnel configuration
@@ -198,7 +207,7 @@ func repairFunc(a *ArgoTunnel) func() {
 	quitCh := a.quitCh
 	origin := a.origin
 	route := a.route
-	logger := a.tunnelConfig.Logger
+	logger := a.log
 	return func() {
 		for {
 			select {
@@ -210,21 +219,21 @@ func repairFunc(a *ArgoTunnel) func() {
 				}
 				if err != nil {
 					func() {
-						logger.WithFields(log.Fields{
+						logger.WithFields(logrus.Fields{
 							"origin":   origin,
 							"hostname": route.ExternalHostname,
 						}).Errorf("tunnel exited with error (%s) '%v', repairing ...", reflect.TypeOf(err), err)
 
 						// linear back-off on runtime error
 						delay := wait.Jitter(repairDelay, repairJitter)
-						logger.WithFields(log.Fields{
+						logger.WithFields(logrus.Fields{
 							"origin":   origin,
 							"hostname": route.ExternalHostname,
 						}).Infof("tunnel repair starts in %v", delay)
 
 						select {
 						case <-quitCh:
-							logger.WithFields(log.Fields{
+							logger.WithFields(logrus.Fields{
 								"origin":   origin,
 								"hostname": route.ExternalHostname,
 							}).Infof("tunnel repair canceled, stop detected.")
@@ -233,7 +242,7 @@ func repairFunc(a *ArgoTunnel) func() {
 						}
 
 						if t.stopCh == nil {
-							logger.WithFields(log.Fields{
+							logger.WithFields(logrus.Fields{
 								"origin":   origin,
 								"hostname": route.ExternalHostname,
 							}).Infof("tunnel repair canceled, stop detected.")
@@ -243,7 +252,7 @@ func repairFunc(a *ArgoTunnel) func() {
 						t.mu.Lock()
 						defer t.mu.Unlock()
 						if t.stopCh == nil {
-							logger.WithFields(log.Fields{
+							logger.WithFields(logrus.Fields{
 								"origin":   origin,
 								"hostname": route.ExternalHostname,
 							}).Infof("tunnel repair canceled, stop detected.")

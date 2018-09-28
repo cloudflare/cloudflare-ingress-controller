@@ -1,14 +1,11 @@
 package controller
 
 import (
-	"flag"
 	"fmt"
 	"testing"
 	"time"
 
-	"github.com/cloudflare/cloudflare-ingress-controller/internal/tunnel"
-
-	"github.com/golang/glog"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
@@ -21,17 +18,9 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	ktesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+
+	"github.com/cloudflare/cloudflare-ingress-controller/internal/tunnel"
 )
-
-func init() {
-	flag.Set("alsologtostderr", fmt.Sprintf("%t", true))
-	var logLevel string
-	flag.StringVar(&logLevel, "logLevel", "6", "test")
-	flag.Lookup("v").Value.Set(logLevel)
-
-	flag.Parse()
-	glog.V(2).Infof("initializing test")
-}
 
 type serviceKeyCheck struct {
 	queueKey, operation, namespace, name string
@@ -232,8 +221,9 @@ func TestNewArgoController(t *testing.T) {
 	t.Parallel()
 	controllerNamespace := "cloudflare" // "cloudflare"
 	fakeClient := &fake.Clientset{}
+	logger, hook := test.NewNullLogger()
 
-	wc := NewTunnelController(fakeClient,
+	wc := NewTunnelController(fakeClient, logger,
 		SecretNamespace("cloudflare"),
 	)
 
@@ -248,6 +238,9 @@ func TestNewArgoController(t *testing.T) {
 
 	assert.Equal(t, wc.options.secretNamespace, controllerNamespace)
 	assert.Equal(t, 0, wc.tunnels.Len())
+
+	hook.Reset()
+	assert.Nil(t, hook.LastEntry())
 }
 
 type tunnelItems struct {
@@ -319,11 +312,12 @@ func getTunnelItems(namespace string) tunnelItems {
 func TestControllerLookups(t *testing.T) {
 	t.Parallel()
 	fakeClient := &fake.Clientset{}
+	logger, hook := test.NewNullLogger()
 
 	serviceNamespace := "acme"
 	items := getTunnelItems(serviceNamespace)
 
-	wc := NewTunnelController(fakeClient,
+	wc := NewTunnelController(fakeClient, logger,
 		SecretNamespace("cloudflare"),
 	)
 
@@ -334,18 +328,20 @@ func TestControllerLookups(t *testing.T) {
 	assert.Equal(t, int32(80), wc.getServicePortForIngress(&items.Ingress).IntVal)
 	assert.Equal(t, "testpool", opts.LbPool)
 	// assert.Equal(t, "test.example.com", wc.getLBPoolForIngress(&items.Ingress))
+	hook.Reset()
+	assert.Nil(t, hook.LastEntry())
 }
 
 func TestTunnelInitialization(t *testing.T) {
 	t.Parallel()
 	fakeClient := &fake.Clientset{}
+	logger, hook := test.NewNullLogger()
 
 	serviceNamespace := "acme"
 	controllerNamespace := "cloudflare"
 	items := getTunnelItems(serviceNamespace)
 
 	fakeClient.Fake.AddReactor("list", "ingresses", func(action ktesting.Action) (bool, runtime.Object, error) {
-		glog.Infof("list is called on ingresses")
 		return true, &v1beta1.IngressList{
 			Items: []v1beta1.Ingress{items.Ingress},
 		}, nil
@@ -353,12 +349,10 @@ func TestTunnelInitialization(t *testing.T) {
 	// service is not listed initially
 
 	fakeClient.Fake.AddReactor("get", "ingresses", func(action ktesting.Action) (bool, runtime.Object, error) {
-		glog.Infof("get is called on ingresses")
 		return true, &items.Ingress, nil
 	})
 
 	fakeClient.Fake.AddReactor("get", "secrets", func(action ktesting.Action) (bool, runtime.Object, error) {
-		glog.Infof("get is called on secrets")
 		return true, &items.Certificate, nil
 	})
 
@@ -366,7 +360,7 @@ func TestTunnelInitialization(t *testing.T) {
 	fakeClient.Fake.AddWatchReactor("ingresses", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 	fakeClient.Fake.AddWatchReactor("ingresses", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 
-	wc := NewTunnelController(fakeClient,
+	wc := NewTunnelController(fakeClient, logger,
 		SecretNamespace("cloudflare"),
 	)
 
@@ -397,11 +391,14 @@ func TestTunnelInitialization(t *testing.T) {
 	assert.Equal(t, "fooservice", fooTunnel.Route().ServiceName)
 	assert.Equal(t, int32(80), fooTunnel.Route().ServicePort.IntVal)
 
+	hook.Reset()
+	assert.Nil(t, hook.LastEntry())
 }
 
 func TestTunnelServiceInitialization(t *testing.T) {
 	t.Parallel()
 	fakeClient := &fake.Clientset{}
+	logger, hook := test.NewNullLogger()
 
 	controllerNamespace := "cloudflare"
 	serviceNamespace := "acme"
@@ -426,7 +423,7 @@ func TestTunnelServiceInitialization(t *testing.T) {
 
 	fakeClient.Fake.AddWatchReactor("*", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 
-	wc := NewTunnelController(fakeClient,
+	wc := NewTunnelController(fakeClient, logger,
 		SecretNamespace("cloudflare"),
 	)
 
@@ -468,11 +465,14 @@ func TestTunnelServiceInitialization(t *testing.T) {
 	assert.Equal(t, "fooservice", fooTunnel.Route().ServiceName)
 	assert.Equal(t, int32(80), fooTunnel.Route().ServicePort.IntVal)
 
+	hook.Reset()
+	assert.Nil(t, hook.LastEntry())
 }
 
 func TestTunnelServicesTwoNS(t *testing.T) {
 	t.Parallel()
 	fakeClient := &fake.Clientset{}
+	logger, hook := test.NewNullLogger()
 
 	controllerNamespace := "cloudflare"
 
@@ -515,7 +515,7 @@ func TestTunnelServicesTwoNS(t *testing.T) {
 
 	fakeClient.Fake.AddWatchReactor("*", ktesting.DefaultWatchReactor(watch.NewFake(), nil))
 
-	wc := NewTunnelController(fakeClient,
+	wc := NewTunnelController(fakeClient, logger,
 		SecretNamespace("cloudflare"),
 	)
 
@@ -558,4 +558,7 @@ func TestTunnelServicesTwoNS(t *testing.T) {
 		assert.Equal(t, "fooservice", tunnel.Route().ServiceName)
 		assert.Equal(t, int32(80), tunnel.Route().ServicePort.IntVal)
 	}
+
+	hook.Reset()
+	assert.Nil(t, hook.LastEntry())
 }

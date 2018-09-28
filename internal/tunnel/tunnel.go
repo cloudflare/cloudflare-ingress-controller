@@ -4,6 +4,8 @@ package tunnel
 // the argo tunnel, matching an external hostname
 // to a kubernetes service
 type Tunnel interface {
+	// Origin returns the tunnel origin
+	Origin() string
 
 	// Route returns the tunnel configuration
 	Route() Route

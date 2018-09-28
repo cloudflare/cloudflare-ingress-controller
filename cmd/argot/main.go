@@ -7,13 +7,14 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/cloudflare/cloudflare-ingress-controller/internal/controller"
 	"github.com/cloudflare/cloudflare-ingress-controller/internal/tunnel"
-	"github.com/golang/glog"
 	"github.com/oklog/run"
+	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -37,9 +38,13 @@ func main() {
 		os.Exit(0)
 	}
 
+	log := logrus.StandardLogger()
+	log.SetLevel(loglevel(flag.CommandLine))
+
 	kclient, err := kubeclient(*kubeconfig)
 	if err != nil {
-		glog.Fatalf("Failed to create kubernetes client: %v", err)
+		log.Fatalf("failed to create kubernetes client: %v", err)
+		os.Exit(1)
 	}
 
 	var g run.Group
@@ -51,7 +56,7 @@ func main() {
 		g.Add(func() error {
 			select {
 			case s := <-sig:
-				glog.Infof("Received signal=%s, exiting gracefully...\n", s.String())
+				log.Infof("received signal=%s, exiting gracefully...\n", s.String())
 				cancel()
 			case <-ctx.Done():
 			}
@@ -63,7 +68,7 @@ func main() {
 	{
 		tunnel.EnableMetrics(5 * time.Second)
 		ctx, cancel := context.WithCancel(context.Background())
-		argo := controller.NewTunnelController(kclient,
+		argo := controller.NewTunnelController(kclient, log,
 			controller.IngressClass(*ingressClass),
 			controller.SecretNamespace(*namespace),
 			controller.Version(version),
@@ -78,7 +83,7 @@ func main() {
 	}
 
 	if err := g.Run(); err != nil {
-		glog.Errorf("Received error, err=%v\n", err)
+		log.Fatalf("received fatal error, err=%v\n", err)
 		os.Exit(1)
 	}
 }
@@ -95,4 +100,21 @@ func kubeclient(kubeconfigpath string) (*kubernetes.Clientset, error) {
 		return nil, err
 	}
 	return kubernetes.NewForConfig(kubeconfig)
+}
+
+// Bridge the glog verbosity flag into a logrus.Level
+func loglevel(flagset *flag.FlagSet) (l logrus.Level) {
+	l = logrus.InfoLevel
+	if f := flagset.Lookup("v"); f != nil {
+		if v, err := strconv.Atoi(f.Value.String()); err == nil {
+			if v >= 0 && v <= 5 {
+				l = logrus.AllLevels[v]
+			} else if v > 5 {
+				l = logrus.DebugLevel
+			} else {
+				l = logrus.PanicLevel
+			}
+		}
+	}
+	return
 }

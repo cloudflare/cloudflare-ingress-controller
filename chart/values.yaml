@@ -3,7 +3,7 @@ controller:
   name: controller
   image:
     repository: gcr.io/cloudflare-registry/argo-tunnel
-    tag: "0.5.2"
+    tag: "0.5.3"
     pullPolicy: Always
   ingressClass: argo-tunnel
   logLevel: 2

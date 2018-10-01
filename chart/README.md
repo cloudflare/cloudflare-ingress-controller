@@ -51,7 +51,7 @@ Parameter | Description | Default
 `controller.image.pullPolicy` | controller container image pull policy | `Always`
 `controller.ingressClass` | name of the ingress class to route through this controller | `argo-tunnel`
 `controller.logLevel` | log-level for this controller | `2`
-`controller.replicaCount` | desired number of controller pods | `1`
+`controller.replicaCount` | desired number of controller pods (load-balancers are required for values larger than 1). | `1`
 `loadBalancing.enabled` | if `true`, replicaCount may be >1, requires load balancing enabled on account | `false`
 `rbac.create` | if `true`, create & use RBAC resources | `true`
 `serviceAccount.create` | if `true`, create a service account | `true`

@@ -197,6 +197,15 @@ func launchFunc(a *ArgoTunnel) func() {
 	stopCh := a.stopCh
 	route := a.tunnelConfig
 	return func() {
+		// panic-recover - trigger tunnel repair machanism
+		// The call to origin.StartTunnelDaemon has been observed to panic.
+		// Process the panic into an error on errCh to trigger tunnel repair.
+		defer func() {
+			if r := recover(); r != nil {
+				e := fmt.Errorf("origin daemon run time panic: %v", r)
+				errCh <- e
+			}
+		}()
 		errCh <- origin.StartTunnelDaemon(route, stopCh, make(chan struct{}))
 	}
 }

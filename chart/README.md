@@ -47,7 +47,7 @@ Parameter | Description | Default
 --- | --- | ---
 `controller.name` | name of the controller component | `controller`
 `controller.image.repository` | controller container image repository | `gcr.io/stackpoint-public/argot`
-`controller.image.tag` | controller container image tag | `0.5.2`
+`controller.image.tag` | controller container image tag | `0.5.3`
 `controller.image.pullPolicy` | controller container image pull policy | `Always`
 `controller.ingressClass` | name of the ingress class to route through this controller | `argo-tunnel`
 `controller.logLevel` | log-level for this controller | `2`

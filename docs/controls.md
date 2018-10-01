@@ -10,7 +10,7 @@
     - 0 - off
     - 1 - low
     - 2 - medium
-    - >=3 - high
+    - 3 - high
 - `argo.cloudflare.com/ha-connections`: the number of high-availability connections to establish
   - defaults to `"4"`
 - `argo.cloudflare.com/heartbeat-count`: minimum number of unacknowledged heartbeats to send before closing the connection

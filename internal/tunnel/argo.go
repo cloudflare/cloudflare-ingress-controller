@@ -86,7 +86,7 @@ func NewArgoTunnel(route Route, log *logrus.Logger, options ...Option) (Tunnel, 
 		Retries:            opts.Retries,
 		HeartbeatInterval:  opts.HeartbeatInterval,
 		MaxHeartbeats:      opts.HeartbeatCount,
-		ClientID:           utilrand.String(16),
+		ClientID:           utilrand.String(32),
 		BuildInfo:          origin.GetBuildInfo(),
 		ReportedVersion:    route.Version,
 		LBPool:             opts.LbPool,
@@ -105,7 +105,7 @@ func NewArgoTunnel(route Route, log *logrus.Logger, options ...Option) (Tunnel, 
 	}
 
 	t := ArgoTunnel{
-		id:           utilrand.String(8),
+		id:           utilrand.String(16),
 		origin:       source,
 		route:        route,
 		options:      opts,
@@ -195,7 +195,7 @@ func (t *ArgoTunnel) CheckStatus() error {
 func launchFunc(a *ArgoTunnel) func() {
 	errCh := a.errCh
 	stopCh := a.stopCh
-	route := a.tunnelConfig
+	tunnelConfig := a.tunnelConfig
 	return func() {
 		// panic-recover - trigger tunnel repair machanism
 		// The call to origin.StartTunnelDaemon has been observed to panic.
@@ -206,7 +206,7 @@ func launchFunc(a *ArgoTunnel) func() {
 				errCh <- e
 			}
 		}()
-		errCh <- origin.StartTunnelDaemon(route, stopCh, make(chan struct{}))
+		errCh <- origin.StartTunnelDaemon(tunnelConfig, stopCh, make(chan struct{}))
 	}
 }
 
@@ -269,6 +269,7 @@ func repairFunc(a *ArgoTunnel) func() {
 						}
 
 						close(t.stopCh)
+						t.tunnelConfig.ClientID = utilrand.String(32)
 						t.stopCh = make(chan struct{})
 						go launchFunc(t)()
 					}()

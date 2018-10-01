@@ -1,6 +1,6 @@
 # High Availability with Argo Tunnels
-A guild to setting up high availability with argo tunnels to span
-Kubernetes clusters or even cloud providers.
+A guide to setting up high availability with argo tunnels to span replicas,
+Kubernetes clusters, or even cloud providers.
 
 - Spanning Clusters
 
@@ -12,6 +12,8 @@ traffic across all tunnels.
 
 ### Requirements
 - Load balancing enabled, [enable here][cloudflare-dashboard-traffic]
+
+> A load-balancer is required to set the controller replica count > 1.
 
 ### Step 1: Create a Load Balancer
 On the Cloudflare dashboard, browse to [Traffic][cloudflare-dashboard-traffic]

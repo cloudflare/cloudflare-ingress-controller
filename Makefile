@@ -106,7 +106,7 @@ misspell:
 		-i clas \
 		-locale US \
 		-error \
-		cmd/* internal/* docs/* chart/*.md *.md
+		cmd/* internal/* docs/* *.md
 
 .PHONY: push
 push: container

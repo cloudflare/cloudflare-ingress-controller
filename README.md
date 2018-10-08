@@ -24,6 +24,13 @@ Without role based access control (RBAC).
 kubectl apply -f deploy/argo-tunnel-no-rbac.yaml
 ```
 
+With [Helm][guide-helm-deploy].
+```bash
+helm install --name anydomain cloudflare/argo-tunnel
+```
+
+> **Note**: replicas >1 requires [load-balancers][argo-tunnel-load-balancing]
+
 ### Guides & Reference
 - [Argo Tunnel: Reference][argo-tunnel-reference]
 - [Argo Tunnel: Quick Start][argo-tunnel-quick-start]
@@ -46,6 +53,7 @@ The [Cloudflare community forum][cloudflare-community] is a place to discuss
 Argo, Argo Tunnel, or any Cloudflare product.
 
 [argo-smart-routing]: https://www.cloudflare.com/products/argo-smart-routing/
+[argo-tunnel-load-balancing]: https://developers.cloudflare.com/argo-tunnel/reference/load-balancing/
 [argo-tunnel-reference]: https://developers.cloudflare.com/argo-tunnel/reference/
 [argo-tunnel-quick-start]: https://developers.cloudflare.com/argo-tunnel/quickstart/
 [cloudflare-community]: https://community.cloudflare.com
@@ -54,8 +62,9 @@ Argo, Argo Tunnel, or any Cloudflare product.
 [controls]: /docs/controls.md
 [guide-first-tunnel]: /docs/guide_first_tunnel.md
 [guide-ha-tunnel]: /docs/guide_ha_tunnel.md
-[guide-helm-deploy]: /chart/README.md
+[guide-helm-deploy]: /docs/guide_helm_deploy.md
 [guide-subdomain-tunnel]: /docs/guide_subdomain_tunnel.md
+[helm-charts]: https://cloudflare.github.io/helm-charts/
 [issues]: https://github.com/cloudflare/cloudflare-ingress-controller/issues
 [observability]: /docs/observability.md
 [releases]: https://github.com/cloudflare/cloudflare-ingress-controller/releases

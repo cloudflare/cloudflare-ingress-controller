@@ -14,7 +14,7 @@ const (
 	// TODO: the concept of a hardcoded default secret name should be deprecated
 	// with the secret namespace, preferring a simple option to define a default
 	// tunnel secret by "namespace/name"
-	SecretNameDefault = "cloudflared-cert"
+	SecretNameDefault = "anydomain"
 )
 
 type options struct {

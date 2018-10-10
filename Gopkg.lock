@@ -42,12 +42,10 @@
   revision = "18c9f6c67e3dfc12e0ddaca748d2887f97a7ac28"
 
 [[projects]]
-  digest = "1:88cffbd483d62d7421bca1eb977706fd775b07e9207cde8c02b5c72ce391b6e8"
+  digest = "1:af3e8ebc474b372f84db129974a6d64f3e455290dcfa848a9a99f893ce61851d"
   name = "github.com/cloudflare/cloudflared"
   packages = [
     "h2mux",
-    "log",
-    "metallog",
     "origin",
     "tunnelrpc",
     "tunnelrpc/pogs",
@@ -55,8 +53,8 @@
     "websocket",
   ]
   pruneopts = ""
-  revision = "6fc6869e4be6c7d51832ea38360ab1010a38cc9c"
-  source = "https://github.com/ntfrnzn/cloudflared.git"
+  revision = "671483a95c23493f63fb554ab9b69ffaf6390149"
+  source = "https://github.com/cloudflare/cloudflared.git"
 
 [[projects]]
   digest = "1:56c130d885a4aacae1dd9c7b71cfe39912c7ebc1ff7d2b46083c8812996dc43b"
@@ -269,22 +267,6 @@
   revision = "8b799c424f57fa123fc63a99d6383bc6e4c02578"
 
 [[projects]]
-  digest = "1:9ea83adf8e96d6304f394d40436f2eb44c1dc3250d223b74088cc253a6cd0a1c"
-  name = "github.com/mattn/go-colorable"
-  packages = ["."]
-  pruneopts = ""
-  revision = "167de6bfdfba052fa6b2d3664c8f5272e23c9072"
-  version = "v0.0.9"
-
-[[projects]]
-  digest = "1:78229b46ddb7434f881390029bd1af7661294af31f6802e0e1bedaad4ab0af3c"
-  name = "github.com/mattn/go-isatty"
-  packages = ["."]
-  pruneopts = ""
-  revision = "0360b2af4f38e8d38c7fce2a9f4e702702d73a39"
-  version = "v0.0.3"
-
-[[projects]]
   digest = "1:4c23ced97a470b17d9ffd788310502a077b9c1f60221a85563e49696276b4147"
   name = "github.com/matttproud/golang_protobuf_extensions"
   packages = ["pbutil"]
@@ -349,12 +331,12 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:4142d94383572e74b42352273652c62afec5b23f325222ed09198f46009022d1"
+  digest = "1:2f69dc6b2685b31a1a410ef697410aa8a669704fb201d45dbd8c1911728afa75"
   name = "github.com/prometheus/client_golang"
   packages = ["prometheus"]
   pruneopts = ""
-  revision = "c5b7fccd204277076155f10851dad72b76a49317"
-  version = "v0.8.0"
+  revision = "967789050ba94deca04a5e84cce8ad472ce313c1"
+  version = "v0.9.0-pre1"
 
 [[projects]]
   branch = "master"
@@ -392,7 +374,10 @@
 [[projects]]
   digest = "1:8cf46b6c18a91068d446e26b67512cf16f1540b45d90b28b9533706a127f0ca6"
   name = "github.com/sirupsen/logrus"
-  packages = ["."]
+  packages = [
+    ".",
+    "hooks/test",
+  ]
   pruneopts = ""
   revision = "c155da19408a8799da419ed3eeb0cb5db0ad5dbc"
   version = "v1.0.5"
@@ -714,6 +699,7 @@
   ]
   pruneopts = ""
   revision = "243bfedb776812540b7e2fb8d4e5c19814ab1ed8"
+  source = "https://github.com/zombiezen/go-capnproto2"
   version = "v2.17.0"
 
 [solve-meta]
@@ -722,10 +708,10 @@
   input-imports = [
     "github.com/cloudflare/cloudflared/origin",
     "github.com/cloudflare/cloudflared/tunnelrpc/pogs",
-    "github.com/golang/glog",
     "github.com/oklog/run",
     "github.com/pkg/errors",
     "github.com/sirupsen/logrus",
+    "github.com/sirupsen/logrus/hooks/test",
     "github.com/stretchr/testify/assert",
     "github.com/stretchr/testify/mock",
     "k8s.io/api/core/v1",
@@ -737,6 +723,7 @@
     "k8s.io/apimachinery/pkg/runtime/schema",
     "k8s.io/apimachinery/pkg/util/intstr",
     "k8s.io/apimachinery/pkg/util/rand",
+    "k8s.io/apimachinery/pkg/util/runtime",
     "k8s.io/apimachinery/pkg/util/wait",
     "k8s.io/apimachinery/pkg/watch",
     "k8s.io/client-go/kubernetes",

@@ -20,14 +20,15 @@ spec:
         app: argo-tunnel
     spec:
       containers:
-      - image: gcr.io/cloudflare-registry/argo-tunnel:0.5.3
+      - image: gcr.io/cloudflare-registry/argo-tunnel:0.6.0
         imagePullPolicy: Always
         name: argo-tunnel
-        command: ["argot"]
+        command: ["argot", "couple"]
         args:
+        - --incluster
+        - --ingress-class=argo-tunnel
+        - --default-origin-secret=$(POD_NAMESPACE)/anydomain
         - --v=2
-        - --ingressClass=argo-tunnel
-        - --namespace=$(POD_NAMESPACE)
         env:
         - name: POD_NAMESPACE
           valueFrom:

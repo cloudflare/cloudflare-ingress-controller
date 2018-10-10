@@ -7,14 +7,17 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/cloudflare/cloudflare-ingress-controller/internal/controller"
+	"github.com/cloudflare/cloudflare-ingress-controller/internal/k8s"
 	"github.com/cloudflare/cloudflare-ingress-controller/internal/tunnel"
 	"github.com/oklog/run"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/alecthomas/kingpin.v2"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -23,74 +26,90 @@ import (
 var version = "UNKNOWN"
 
 func main() {
+	name := filepath.Base(os.Args[0])
+	app := kingpin.New(name, "Cloudflare Argo-Tunnel Kubernetes ingress controller.")
+	verbose := app.Flag("v", "enable logging at specified level").Default("3").Int()
 
-	kubeconfig := flag.String("kubeconfig", "", "Path to a kubeconfig file")
-	printVersion := flag.Bool("version", false, "prints application version")
-	namespace := flag.String("namespace", controller.SecretNamespaceDefault, "Namespace to run in")
-	ingressClass := flag.String("ingressClass", controller.IngressClassDefault, "Name of ingress class, used in ingress annotation")
+	// variant (print version information)
+	variant := app.Command("version", "print version")
 
-	flag.Set("logtostderr", "true")
-	flag.Parse()
+	// couple (build tunnels to services/endpoints)
+	couple := app.Command("couple", "Couple services with argo tunnels")
+	incluster := couple.Flag("incluster", "use in-cluster configuration.").Bool()
+	kubeconfig := couple.Flag("kubeconfig", "path to kubeconfig (if not in running inside a cluster)").Default(filepath.Join(os.Getenv("HOME"), ".kube", "config")).String()
+	ingressclass := couple.Flag("ingress-class", "ingress class name").Default(controller.IngressClassDefault).String()
+	originsecret := k8s.ObjMixin(couple.Flag("default-origin-secret", "default origin certificate secret <namespace>/<name>").Default(controller.SecretNamespaceDefault + "/" + controller.SecretNameDefault))
 
-	if *printVersion {
-		name := filepath.Base(os.Args[0])
-		fmt.Printf("%s %s\n", name, version)
-		os.Exit(0)
-	}
+	args := os.Args[1:]
+	switch kingpin.MustParse(app.Parse(args)) {
+	// variant (print version information)
+	case variant.FullCommand():
+		fmt.Printf("%s %s %s/%s\n", name, version, runtime.GOOS, runtime.GOARCH)
 
-	log := logrus.StandardLogger()
-	log.SetLevel(loglevel(flag.CommandLine))
+	// couple (build tunnels to services/endpoints)
+	case couple.FullCommand():
+		// mirror verbosity between glog and logrus
+		flag.Set("logtostderr", "true")
+		flag.Set("v", strconv.Itoa(*verbose))
+		flag.Parse()
 
-	kclient, err := kubeclient(*kubeconfig)
-	if err != nil {
-		log.Fatalf("failed to create kubernetes client: %v", err)
-		os.Exit(1)
-	}
+		log := logrus.StandardLogger()
+		log.SetLevel(logruslevel(*verbose))
+		log.Out = os.Stderr
 
-	var g run.Group
-	{
-		ctx, cancel := context.WithCancel(context.Background())
-		sig := make(chan os.Signal, 1)
-		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+		var g run.Group
+		{
+			ctx, cancel := context.WithCancel(context.Background())
+			sig := make(chan os.Signal, 1)
+			signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
-		g.Add(func() error {
-			select {
-			case s := <-sig:
-				log.Infof("received signal=%s, exiting gracefully...\n", s.String())
+			g.Add(func() error {
+				select {
+				case s := <-sig:
+					log.Infof("received signal=%s, exiting gracefully...\n", s.String())
+					cancel()
+				case <-ctx.Done():
+				}
+				return ctx.Err()
+			}, func(_ error) {
 				cancel()
-			case <-ctx.Done():
+			})
+		}
+		{
+			kclient, err := kubeclient(*kubeconfig, *incluster)
+			if err != nil {
+				log.Fatalf("failed to create kubernetes client: %v", err)
+				os.Exit(1)
 			}
-			return ctx.Err()
-		}, func(_ error) {
-			cancel()
-		})
-	}
-	{
-		tunnel.EnableMetrics(5 * time.Second)
-		ctx, cancel := context.WithCancel(context.Background())
-		argo := controller.NewTunnelController(kclient, log,
-			controller.IngressClass(*ingressClass),
-			controller.SecretNamespace(*namespace),
-			controller.Version(version),
-		)
 
-		g.Add(func() error {
-			argo.Run(ctx.Done())
-			return nil
-		}, func(error) {
-			cancel()
-		})
-	}
+			tunnel.EnableMetrics(5 * time.Second)
+			ctx, cancel := context.WithCancel(context.Background())
+			argo := controller.NewTunnelController(kclient, log,
+				controller.IngressClass(*ingressclass),
+				controller.SecretNamespace(originsecret.Namespace),
+				controller.SecretName(originsecret.Name),
+				controller.Version(version),
+			)
 
-	if err := g.Run(); err != nil {
-		log.Fatalf("received fatal error, err=%v\n", err)
-		os.Exit(1)
+			g.Add(func() error {
+				argo.Run(ctx.Done())
+				return nil
+			}, func(error) {
+				cancel()
+			})
+		}
+
+		if err := g.Run(); err != nil {
+			log.Fatalf("received fatal error, err=%v\n", err)
+			os.Exit(1)
+		}
 	}
 }
 
-func kubeclient(kubeconfigpath string) (*kubernetes.Clientset, error) {
+// select a kubernetes client
+func kubeclient(kubeconfigpath string, incluster bool) (*kubernetes.Clientset, error) {
 	kubeconfig, err := func() (*rest.Config, error) {
-		if kubeconfigpath != "" {
+		if kubeconfigpath != "" && !incluster {
 			return clientcmd.BuildConfigFromFlags("", kubeconfigpath)
 		}
 		return rest.InClusterConfig()
@@ -102,19 +121,14 @@ func kubeclient(kubeconfigpath string) (*kubernetes.Clientset, error) {
 	return kubernetes.NewForConfig(kubeconfig)
 }
 
-// Bridge the glog verbosity flag into a logrus.Level
-func loglevel(flagset *flag.FlagSet) (l logrus.Level) {
-	l = logrus.InfoLevel
-	if f := flagset.Lookup("v"); f != nil {
-		if v, err := strconv.Atoi(f.Value.String()); err == nil {
-			if v >= 0 && v <= 5 {
-				l = logrus.AllLevels[v]
-			} else if v > 5 {
-				l = logrus.DebugLevel
-			} else {
-				l = logrus.PanicLevel
-			}
-		}
+// bridge verbose flag into a logrus.Level
+func logruslevel(v int) (l logrus.Level) {
+	if v >= 0 && v <= 5 {
+		l = logrus.AllLevels[v]
+	} else if v > 5 {
+		l = logrus.DebugLevel
+	} else {
+		l = logrus.PanicLevel
 	}
 	return
 }

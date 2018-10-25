@@ -18,7 +18,7 @@ func TestObjMixin(t *testing.T) {
 		"obj-empty": {
 			in:  "",
 			out: &ObjValue{},
-			err: fmt.Errorf("expected '<namespace>/<name>' got '%s'", ""),
+			err: nil,
 		},
 		"obj-no-name": {
 			in:  "a/",

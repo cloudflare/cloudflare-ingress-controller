@@ -38,12 +38,12 @@ build-dir:
 	@mkdir -p $(TMP_DIR)
 
 .PHONY: check
-check: test vet fmt staticcheck unused misspell
+check: test-race vet fmt staticcheck unused misspell
 
 .PHONY: clean
 clean:
 	@echo cleaning build targets
-	@rm -rf bin .build
+	@rm -rf bin .build coverage.txt
 
 .PHONY: container
 container:
@@ -126,12 +126,12 @@ staticcheck:
 .PHONY: test
 test: install
 	@echo testing code for issues
-	@go test ./...
+	@go test -coverprofile=coverage.txt -covermode=atomic ./...
 
 .PHONY: test-race
 test-race: | test
 	@echo testing code for races
-	@go test -race ./...
+	@go test -coverprofile=coverage.txt -covermode=atomic -race ./...
 
 .PHONY: unused
 unused:

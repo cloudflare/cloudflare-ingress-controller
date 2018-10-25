@@ -1,16 +1,13 @@
-package controller
+package argotunnel
 
 import (
 	"testing"
 	"time"
 
-	"github.com/cloudflare/cloudflare-ingress-controller/internal/tunnel"
-
+	"github.com/stretchr/testify/assert"
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestParseIngressClassAnnotation(t *testing.T) {
@@ -70,11 +67,11 @@ func TestParseIngressTunnelOptions(t *testing.T) {
 	t.Parallel()
 	for name, test := range map[string]struct {
 		in  *v1beta1.Ingress
-		out tunnel.Options
+		out tunnelOptions
 	}{
 		"empty-ingress": {
 			in:  &v1beta1.Ingress{},
-			out: tunnel.CollectOptions(nil),
+			out: collectTunnelOptions(nil),
 		},
 		"without-options": {
 			in: &v1beta1.Ingress{
@@ -90,7 +87,7 @@ func TestParseIngressTunnelOptions(t *testing.T) {
 					},
 				},
 			},
-			out: tunnel.CollectOptions(nil),
+			out: collectTunnelOptions(nil),
 		},
 		"without-some-options": {
 			in: &v1beta1.Ingress{
@@ -109,12 +106,12 @@ func TestParseIngressTunnelOptions(t *testing.T) {
 					},
 				},
 			},
-			out: tunnel.Options{
-				HaConnections:     2,
-				HeartbeatCount:    5,
-				HeartbeatInterval: 5 * time.Second,
-				LbPool:            "test-lb-pool",
-				Retries:           8,
+			out: tunnelOptions{
+				haConnections:     2,
+				heartbeatCount:    5,
+				heartbeatInterval: 5 * time.Second,
+				lbPool:            "test-lb-pool",
+				retries:           8,
 			},
 		},
 		"with-all-options": {
@@ -138,18 +135,18 @@ func TestParseIngressTunnelOptions(t *testing.T) {
 					},
 				},
 			},
-			out: tunnel.Options{
-				CompressionQuality: 1,
-				HaConnections:      2,
-				HeartbeatCount:     4,
-				HeartbeatInterval:  4 * time.Millisecond,
-				LbPool:             "test-lb-pool",
-				NoChunkedEncoding:  true,
-				Retries:            8,
+			out: tunnelOptions{
+				compressionQuality: 1,
+				haConnections:      2,
+				heartbeatCount:     4,
+				heartbeatInterval:  4 * time.Millisecond,
+				lbPool:             "test-lb-pool",
+				noChunkedEncoding:  true,
+				retries:            8,
 			},
 		},
 	} {
-		out := tunnel.CollectOptions(parseIngressTunnelOptions(test.in))
+		out := collectTunnelOptions(parseIngressTunnelOptions(test.in))
 		assert.Equalf(t, test.out, out, "test '%s' value mismatch", name)
 	}
 }

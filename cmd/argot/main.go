@@ -18,6 +18,8 @@ import (
 	"github.com/cloudflare/cloudflare-ingress-controller/internal/argotunnel"
 	"github.com/cloudflare/cloudflare-ingress-controller/internal/k8s"
 	"github.com/oklog/run"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/netutil"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -43,7 +45,8 @@ func main() {
 	ingressclass := couple.Flag("ingress-class", "ingress class name").Default(argotunnel.IngressClassDefault).String()
 	originsecret := k8s.ObjMixin(couple.Flag("default-origin-secret", "default origin certificate secret <namespace>/<name>"))
 	debugaddr := couple.Flag("debug-address", "profiling bind address").Default("127.0.0.1:8081").String()
-	connlimit := couple.Flag("connection-limit", "profiling bind address").Default("256").Int()
+	metricsaddr := couple.Flag("metrics-address", "metrics bind address").Default("0.0.0.0:8080").String()
+	connlimit := couple.Flag("connection-limit", "profiling bind address").Default("512").Int()
 
 	args := os.Args[1:]
 	switch kingpin.MustParse(app.Parse(args)) {
@@ -61,6 +64,12 @@ func main() {
 		log := logrus.StandardLogger()
 		log.SetLevel(logruslevel(*verbose))
 		log.Out = os.Stderr
+
+		promregistry := prometheus.NewRegistry()
+		promregistry.MustRegister(
+			prometheus.NewProcessCollector(os.Getpid(), ""),
+			prometheus.NewGoCollector(),
+		)
 
 		var g run.Group
 		{
@@ -106,6 +115,30 @@ func main() {
 				return debugServer.Serve(debugListener)
 			}, func(_ error) {
 				debugServer.Shutdown(context.Background())
+			})
+		}
+		{
+			metricServerMux := http.NewServeMux()
+			metricServerMux.Handle("/metrics", promhttp.HandlerFor(promregistry, promhttp.HandlerOpts{}))
+
+			metricsListener, err := net.Listen("tcp", *metricsaddr)
+			if err != nil {
+				log.Fatalf("cannot open metrics listener: %v", err)
+				os.Exit(1)
+			}
+
+			metricsListener = netutil.LimitListener(metricsListener, *connlimit)
+			metricsServer := &http.Server{
+				Handler:      metricServerMux,
+				ReadTimeout:  5 * time.Second,
+				WriteTimeout: 5 * time.Second,
+			}
+			log.Debugf("metrics listener on address: %s", *metricsaddr)
+
+			g.Add(func() error {
+				return metricsServer.Serve(metricsListener)
+			}, func(_ error) {
+				metricsServer.Shutdown(context.Background())
 			})
 		}
 		{

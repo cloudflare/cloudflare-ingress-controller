@@ -59,7 +59,7 @@ func newServiceInformer(client kubernetes.Interface, opts options, rs ...cache.R
 func newInformer(c cache.Getter, resource string, objType runtime.Object, resyncPeriod time.Duration, rs ...cache.ResourceEventHandler) cache.SharedIndexInformer {
 	lw := cache.NewListWatchFromClient(c, resource, v1.NamespaceAll, fields.Everything())
 	sw := cache.NewSharedIndexInformer(lw, objType, resyncPeriod, cache.Indexers{
-		cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
+		//cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
 	})
 	for _, r := range rs {
 		sw.AddEventHandler(r)

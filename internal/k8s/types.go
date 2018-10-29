@@ -28,15 +28,17 @@ type ObjValue Obj
 
 // Set values the object from a string or errors.
 func (o *ObjValue) Set(val string) error {
-	parts := strings.SplitN(strings.TrimSpace(val), objDelim, 3)
-	if len(parts) != 2 {
-		return fmt.Errorf("expected '<namespace>/<name>' got '%s'", val)
-	} else if parts[0] == "" {
-		return fmt.Errorf("expected '<namespace>/<name>' got '%s'", val)
-	} else if parts[1] == "" {
-		return fmt.Errorf("expected '<namespace>/<name>' got '%s'", val)
+	if len(val) > 0 {
+		parts := strings.SplitN(strings.TrimSpace(val), objDelim, 3)
+		if len(parts) != 2 {
+			return fmt.Errorf("expected '<namespace>/<name>' got '%s'", val)
+		} else if parts[0] == "" {
+			return fmt.Errorf("expected '<namespace>/<name>' got '%s'", val)
+		} else if parts[1] == "" {
+			return fmt.Errorf("expected '<namespace>/<name>' got '%s'", val)
+		}
+		o.Namespace, o.Name = parts[0], parts[1]
 	}
-	o.Namespace, o.Name = parts[0], parts[1]
 	return nil
 }
 

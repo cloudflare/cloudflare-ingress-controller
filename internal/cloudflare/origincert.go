@@ -85,11 +85,12 @@ QzMmZpRpIBB321ZBlcnlxiTJvWxvbCPHKHj20VwwAz7LONF59s84ZsOqfoBv8gKM
 s0s5dsq5zpLeaw==
 -----END CERTIFICATE-----`
 
+// GetCloudflareRootCA appears to have been copied from cloudflared
+// TODO: replace with configuration
 func GetCloudflareRootCA() *x509.CertPool {
-	ca := x509.NewCertPool()
-	if !ca.AppendCertsFromPEM([]byte(cloudflareRootCA)) {
-		// should never happen
-		panic("failure loading Cloudflare origin CA pem")
-	}
-	return ca
+	return func() *x509.CertPool {
+		ca := x509.NewCertPool()
+		ca.AppendCertsFromPEM([]byte(cloudflareRootCA))
+		return ca
+	}()
 }

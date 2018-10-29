@@ -12,9 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cloudflare/cloudflare-ingress-controller/internal/controller"
+	"github.com/cloudflare/cloudflare-ingress-controller/internal/argotunnel"
 	"github.com/cloudflare/cloudflare-ingress-controller/internal/k8s"
-	"github.com/cloudflare/cloudflare-ingress-controller/internal/tunnel"
 	"github.com/oklog/run"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -37,8 +36,8 @@ func main() {
 	couple := app.Command("couple", "Couple services with argo tunnels")
 	incluster := couple.Flag("incluster", "use in-cluster configuration.").Bool()
 	kubeconfig := couple.Flag("kubeconfig", "path to kubeconfig (if not in running inside a cluster)").Default(filepath.Join(os.Getenv("HOME"), ".kube", "config")).String()
-	ingressclass := couple.Flag("ingress-class", "ingress class name").Default(controller.IngressClassDefault).String()
-	originsecret := k8s.ObjMixin(couple.Flag("default-origin-secret", "default origin certificate secret <namespace>/<name>").Default(controller.SecretNamespaceDefault + "/" + controller.SecretNameDefault))
+	ingressclass := couple.Flag("ingress-class", "ingress class name").Default(argotunnel.IngressClassDefault).String()
+	originsecret := k8s.ObjMixin(couple.Flag("default-origin-secret", "default origin certificate secret <namespace>/<name>"))
 
 	args := os.Args[1:]
 	switch kingpin.MustParse(app.Parse(args)) {
@@ -82,13 +81,13 @@ func main() {
 				os.Exit(1)
 			}
 
-			tunnel.EnableMetrics(5 * time.Second)
+			argotunnel.EnableMetrics(5 * time.Second)
+			argotunnel.SetVersion(version)
+
 			ctx, cancel := context.WithCancel(context.Background())
-			argo := controller.NewTunnelController(kclient, log,
-				controller.IngressClass(*ingressclass),
-				controller.SecretNamespace(originsecret.Namespace),
-				controller.SecretName(originsecret.Name),
-				controller.Version(version),
+			argo := argotunnel.NewController(kclient, log,
+				argotunnel.IngressClass(*ingressclass),
+				argotunnel.Secret(originsecret.Name, originsecret.Namespace),
 			)
 
 			g.Add(func() error {

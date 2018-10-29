@@ -6,6 +6,7 @@ vendor/
 .vs/
 .vscode/
 .idea/
+coverage.txt
 
 # MacOS
 .DS_Store

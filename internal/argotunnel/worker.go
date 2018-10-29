@@ -48,7 +48,7 @@ func (w *worker) processNextItem() bool {
 
 	if err := w.sync(key.(string)); err == nil {
 		w.queue.Forget(key)
-	} else if w.queue.NumRequeues(key) < 2 {
+	} else if w.queue.NumRequeues(key) < w.options.requeueLimit {
 		w.queue.AddRateLimited(key)
 	} else {
 		w.queue.Forget(key)

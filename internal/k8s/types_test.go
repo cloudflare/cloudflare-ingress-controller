@@ -51,3 +51,38 @@ func TestObjMixin(t *testing.T) {
 		assert.Equalf(t, test.err, err, "test '%s' err mismatch", name)
 	}
 }
+
+func TestObjString(t *testing.T) {
+	t.Parallel()
+	for name, test := range map[string]struct {
+		obj *ObjValue
+		out string
+	}{
+		"obj-empty": {
+			obj: &ObjValue{},
+			out: "",
+		},
+		"obj-no-name": {
+			obj: &ObjValue{
+				Namespace: "a",
+			},
+			out: "",
+		},
+		"obj-no-namespace": {
+			obj: &ObjValue{
+				Name: "b",
+			},
+			out: "",
+		},
+		"obj-okay": {
+			obj: &ObjValue{
+				Namespace: "a",
+				Name:      "b",
+			},
+			out: "a/b",
+		},
+	} {
+		out := test.obj.String()
+		assert.Equalf(t, test.out, out, "test '%s' value mismatch", name)
+	}
+}

@@ -4,6 +4,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
+	"net/http"
+	"net/http/pprof"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -16,6 +19,7 @@ import (
 	"github.com/cloudflare/cloudflare-ingress-controller/internal/k8s"
 	"github.com/oklog/run"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/netutil"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -38,6 +42,8 @@ func main() {
 	kubeconfig := couple.Flag("kubeconfig", "path to kubeconfig (if not in running inside a cluster)").Default(filepath.Join(os.Getenv("HOME"), ".kube", "config")).String()
 	ingressclass := couple.Flag("ingress-class", "ingress class name").Default(argotunnel.IngressClassDefault).String()
 	originsecret := k8s.ObjMixin(couple.Flag("default-origin-secret", "default origin certificate secret <namespace>/<name>"))
+	debugaddr := couple.Flag("debug-address", "profiling bind address").Default("127.0.0.1:8081").String()
+	connlimit := couple.Flag("connection-limit", "profiling bind address").Default("256").Int()
 
 	args := os.Args[1:]
 	switch kingpin.MustParse(app.Parse(args)) {
@@ -72,6 +78,34 @@ func main() {
 				return ctx.Err()
 			}, func(_ error) {
 				cancel()
+			})
+		}
+		{
+			debugServerMux := http.NewServeMux()
+			debugServerMux.HandleFunc("/debug/pprof/", pprof.Index)
+			debugServerMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+			debugServerMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+			debugServerMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+			debugServerMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+
+			debugListener, err := net.Listen("tcp", *debugaddr)
+			if err != nil {
+				log.Fatalf("cannot open debug listener: %v", err)
+				os.Exit(1)
+			}
+
+			debugListener = netutil.LimitListener(debugListener, *connlimit)
+			debugServer := &http.Server{
+				Handler:      debugServerMux,
+				ReadTimeout:  5 * time.Second,
+				WriteTimeout: 5 * time.Second,
+			}
+			log.Debugf("debug listener on address: %s", *debugaddr)
+
+			g.Add(func() error {
+				return debugServer.Serve(debugListener)
+			}, func(_ error) {
+				debugServer.Shutdown(context.Background())
 			})
 		}
 		{

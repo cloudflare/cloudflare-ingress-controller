@@ -1,9 +1,8 @@
 package argotunnel
 
 import (
+	"fmt"
 	"testing"
-
-	"k8s.io/client-go/tools/cache"
 
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -11,7 +10,63 @@ import (
 	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/tools/cache"
 )
+
+func TestHandleResource(t *testing.T) {
+	t.Parallel()
+	for name, test := range map[string]struct {
+		tr   *syncTranslator
+		kind string
+		key  string
+		out  error
+	}{
+		"kind-unexpected": {
+			tr:   newMockedSyncTranslator(),
+			kind: "unit",
+			key:  "unit/unit",
+			out:  fmt.Errorf("unexpected kind (%q) in key (%q)", "unit", "unit/unit"),
+		},
+		"kind-supported": {
+			tr: &syncTranslator{
+				informers: informerset{
+					ingress: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("ByIndex", "secret", "unit/sec-a").Return([]interface{}{}, nil)
+							return idx
+						}())
+						return i
+					}(),
+					secret: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("GetByKey", "unit/sec-a").Return(&v1.Secret{
+								Data: map[string][]byte{
+									"cert.pem": []byte("sec-a-data"),
+								},
+							}, true, nil)
+							return idx
+						}())
+						return i
+					}(),
+				},
+			},
+			kind: "secret",
+			key:  "unit/sec-a",
+			out:  nil,
+		},
+	} {
+		logger, hook := logtest.NewNullLogger()
+		test.tr.log = logger
+		out := test.tr.handleResource(test.kind, test.key)
+		assert.Equalf(t, test.out, out, "test '%s' error mismatch", name)
+		hook.Reset()
+		assert.Nil(t, hook.LastEntry())
+	}
+}
 
 func TestGetRouteFromIngress(t *testing.T) {
 	t.Parallel()

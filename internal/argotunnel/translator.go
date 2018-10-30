@@ -44,10 +44,10 @@ func (t *syncTranslator) waitForCacheSync(stopCh <-chan struct{}) (ok bool) {
 
 func (t *syncTranslator) handleResource(kind, key string) (err error) {
 	handlerFuncs := map[string]func(kind, key string) error{
-		endpointKind: t.handleEndpoint,
+		endpointKind: t.handleByKind,
 		ingressKind:  t.handleIngress,
-		secretKind:   t.handleSecret,
-		serviceKind:  t.handleService,
+		secretKind:   t.handleByKind,
+		serviceKind:  t.handleByKind,
 	}
 	if handlerFunc, ok := handlerFuncs[kind]; ok {
 		err = handlerFunc(kind, key)
@@ -57,44 +57,12 @@ func (t *syncTranslator) handleResource(kind, key string) (err error) {
 	return
 }
 
-func (t *syncTranslator) handleEndpoint(kind, key string) (err error) {
-	_, exists, err := t.informers.endpoint.GetIndexer().GetByKey(key)
-	if err == nil {
-		if exists {
-			t.updateByKind(kind, key)
-		} else {
-			t.deleteByKind(kind, key)
-		}
+func (t *syncTranslator) handleByKind(kind, key string) (err error) {
+	indexer, err := t.informers.getKindIndexer(kind)
+	if err != nil {
+		return
 	}
-	return
-}
-
-func (t *syncTranslator) handleIngress(kind, key string) (err error) {
-	obj, exists, err := t.informers.ingress.GetIndexer().GetByKey(key)
-	if err == nil {
-		if exists {
-			t.updateIngress(key, obj.(*v1beta1.Ingress))
-		} else {
-			t.deleteIngress(key)
-		}
-	}
-	return
-}
-
-func (t *syncTranslator) handleSecret(kind, key string) (err error) {
-	_, exists, err := t.informers.secret.GetIndexer().GetByKey(key)
-	if err == nil {
-		if exists {
-			t.updateByKind(kind, key)
-		} else {
-			t.deleteByKind(kind, key)
-		}
-	}
-	return
-}
-
-func (t *syncTranslator) handleService(kind, key string) (err error) {
-	_, exists, err := t.informers.service.GetIndexer().GetByKey(key)
+	_, exists, err := indexer.GetByKey(key)
 	if err == nil {
 		if exists {
 			t.updateByKind(kind, key)
@@ -146,7 +114,20 @@ func (t *syncTranslator) deleteByKind(kind, key string) (err error) {
 	return
 }
 
+func (t *syncTranslator) handleIngress(kind, key string) (err error) {
+	obj, exists, err := t.informers.ingress.GetIndexer().GetByKey(key)
+	if err == nil {
+		if exists {
+			t.updateIngress(key, obj.(*v1beta1.Ingress))
+		} else {
+			t.deleteIngress(key)
+		}
+	}
+	return
+}
+
 func (t *syncTranslator) updateIngress(key string, ing *v1beta1.Ingress) (err error) {
+	t.log.Debugf("translator update ingress: %s", key)
 	if route := t.getRouteFromIngress(ing); route != nil {
 		err = t.router.updateRoute(route)
 	}
@@ -255,13 +236,11 @@ func (t *syncTranslator) getRouteFromIngress(ing *v1beta1.Ingress) (r *tunnelRou
 			cert, exists := k8s.GetSecretCert(obj.(*v1.Secret))
 			if !exists {
 				t.log.Warnf("translator secret 'cert.pem' missing on ingress: %s, host: %s, path: %+v", ingkey, host, path)
+				continue
 			}
 
 			// TODO: validate certificate against host
-			// with the validation, a link is created and started but stuck
-			// in a repair loop (errors immediately on launch)
-			// https://golang.org/src/crypto/x509/example_test.go
-			// https://golang.org/pkg/crypto/x509/#Certificate.VerifyHostname
+			// https://golang.org/pkg/crypto/x509/#Certificate.VerifyHostnam
 
 			// attach rule|link to route
 			rule := tunnelRule{

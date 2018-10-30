@@ -12,6 +12,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+// TODO: consider registering indexers by kind in a map
 type informerset struct {
 	endpoint cache.SharedIndexInformer
 	ingress  cache.SharedIndexInformer
@@ -24,6 +25,21 @@ func (i *informerset) run(stopCh <-chan struct{}) {
 	go i.ingress.Run(stopCh)
 	go i.secret.Run(stopCh)
 	go i.service.Run(stopCh)
+}
+
+func (i *informerset) getKindIndexer(kind string) (idx cache.Indexer, err error) {
+	indexerFuncs := map[string]func() cache.Indexer{
+		endpointKind: i.endpoint.GetIndexer,
+		ingressKind:  i.ingress.GetIndexer,
+		secretKind:   i.secret.GetIndexer,
+		serviceKind:  i.service.GetIndexer,
+	}
+	if indexerFunc, ok := indexerFuncs[kind]; ok {
+		idx = indexerFunc()
+	} else {
+		err = fmt.Errorf("unexpected kind (%q)", kind)
+	}
+	return
 }
 
 func (i *informerset) waitForCacheSync(stopCh <-chan struct{}) bool {

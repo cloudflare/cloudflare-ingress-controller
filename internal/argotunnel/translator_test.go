@@ -6,13 +6,10 @@ import (
 
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
-
-	/*
-		"k8s.io/api/core/v1"
-		"k8s.io/api/extensions/v1beta1"
-		metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-		"k8s.io/apimachinery/pkg/util/intstr"
-	*/
+	"k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -124,7 +121,6 @@ func TestHandleResource(t *testing.T) {
 	}
 }
 
-/*
 func TestGetRouteFromIngress(t *testing.T) {
 	t.Parallel()
 	for name, test := range map[string]struct {
@@ -137,7 +133,7 @@ func TestGetRouteFromIngress(t *testing.T) {
 			ing: nil,
 			out: nil,
 		},
-		"ing-no-rules": {
+		"ing-empty": {
 			tr: newMockedSyncTranslator(),
 			ing: &v1beta1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
@@ -151,46 +147,6 @@ func TestGetRouteFromIngress(t *testing.T) {
 				Spec: v1beta1.IngressSpec{
 					TLS:   []v1beta1.IngressTLS{},
 					Rules: []v1beta1.IngressRule{},
-				},
-			},
-			out: &tunnelRoute{
-				name:      "unit",
-				namespace: "unit",
-				options:   collectTunnelOptions(parseIngressTunnelOptions(&v1beta1.Ingress{})),
-				links:     tunnelRouteLinkMap{},
-			},
-		},
-		"ing-rule-path": {
-			tr: newMockedSyncTranslator(),
-			ing: &v1beta1.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "unit",
-					Namespace: "unit",
-				},
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "Ingress",
-					APIVersion: "v1beta1",
-				},
-				Spec: v1beta1.IngressSpec{
-					TLS: []v1beta1.IngressTLS{},
-					Rules: []v1beta1.IngressRule{
-						{
-							Host: "a.unit.com",
-							IngressRuleValue: v1beta1.IngressRuleValue{
-								HTTP: &v1beta1.HTTPIngressRuleValue{
-									Paths: []v1beta1.HTTPIngressPath{
-										{
-											Path: "/unit",
-											Backend: v1beta1.IngressBackend{
-												ServiceName: "svc-a",
-												ServicePort: intstr.FromString("http"),
-											},
-										},
-									},
-								},
-							},
-						},
-					},
 				},
 			},
 			out: &tunnelRoute{
@@ -223,17 +179,14 @@ func TestGetRouteFromIngress(t *testing.T) {
 						}())
 						return i
 					}(),
-					ingress: func() cache.SharedIndexInformer {
-						i := &mockSharedIndexInformer{}
-						return i
-					}(),
+					ingress: &mockSharedIndexInformer{},
 					secret: func() cache.SharedIndexInformer {
 						i := &mockSharedIndexInformer{}
 						i.On("GetIndexer").Return(func() cache.Indexer {
 							idx := &mockIndexer{}
 							idx.On("GetByKey", "unit/sec-a").Return(&v1.Secret{
 								Data: map[string][]byte{
-									"cert.pem": []byte("sec-a-data"),
+									"cert.pem": genCertforHost("a.unit.com"),
 								},
 							}, true, nil)
 							return idx
@@ -339,7 +292,415 @@ func TestGetRouteFromIngress(t *testing.T) {
 		assert.Nil(t, hook.LastEntry())
 	}
 }
-*/
+
+func TestGetVerifiedCert(t *testing.T) {
+	t.Parallel()
+	for name, test := range map[string]struct {
+		tr     *syncTranslator
+		secret resource
+		host   string
+		cert   []byte
+		exists bool
+		err    error
+	}{
+		"secret-does-not-exist": {
+			tr: &syncTranslator{
+				informers: informerset{
+					secret: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("GetByKey", "unit/sec-a").Return(&v1.Secret{}, false, nil)
+							return idx
+						}())
+						return i
+					}(),
+				},
+				router: &mockTunnelRouter{},
+			},
+			secret: resource{
+				namespace: "unit",
+				name:      "sec-a",
+			},
+			host:   "a.unit.com",
+			cert:   nil,
+			exists: false,
+			err:    fmt.Errorf("secret 'unit/sec-a' does not exist"),
+		},
+		"secret-lookup-error": {
+			tr: &syncTranslator{
+				informers: informerset{
+					secret: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("GetByKey", "unit/sec-a").Return(&v1.Secret{}, false, fmt.Errorf("lookup-error"))
+							return idx
+						}())
+						return i
+					}(),
+				},
+				router: &mockTunnelRouter{},
+			},
+			secret: resource{
+				namespace: "unit",
+				name:      "sec-a",
+			},
+			host:   "a.unit.com",
+			cert:   nil,
+			exists: false,
+			err:    fmt.Errorf("lookup-error"),
+		},
+		"secret-no-cert": {
+			tr: &syncTranslator{
+				informers: informerset{
+					secret: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("GetByKey", "unit/sec-a").Return(&v1.Secret{
+								Data: map[string][]byte{},
+							}, true, nil)
+							return idx
+						}())
+						return i
+					}(),
+				},
+				router: &mockTunnelRouter{},
+			},
+			secret: resource{
+				namespace: "unit",
+				name:      "sec-a",
+			},
+			host:   "a.unit.com",
+			cert:   nil,
+			exists: false,
+			err:    fmt.Errorf("secret 'unit/sec-a' missing 'cert.pem'"),
+		},
+		"secret-okay": {
+			tr: &syncTranslator{
+				informers: informerset{
+					secret: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("GetByKey", "unit/sec-a").Return(&v1.Secret{
+								Data: map[string][]byte{
+									"cert.pem": genCertforHost("a.unit.com"),
+								},
+							}, true, nil)
+							return idx
+						}())
+						return i
+					}(),
+				},
+				router: &mockTunnelRouter{},
+			},
+			secret: resource{
+				namespace: "unit",
+				name:      "sec-a",
+			},
+			host:   "a.unit.com",
+			cert:   nil,
+			exists: true,
+			err:    nil,
+		},
+	} {
+		cert, exists, err := test.tr.getVerifiedCert(test.secret.namespace, test.secret.name, test.host)
+		assert.Equalf(t, test.exists, exists, "test '%s' exists mismatch", name)
+		assert.Equalf(t, test.err, err, "test '%s' error mismatch", name)
+		if exists {
+			assert.NotEmptyf(t, cert, "test '%s' cert not empty", name)
+		} else {
+			assert.Emptyf(t, cert, "test '%s' cert empty", name)
+		}
+	}
+}
+
+func TestGetVerifiedPort(t *testing.T) {
+	t.Parallel()
+	for name, test := range map[string]struct {
+		tr      *syncTranslator
+		service resource
+		port    intstr.IntOrString
+		out     int32
+		exists  bool
+		err     error
+	}{
+		"service-does-not-exist": {
+			tr: &syncTranslator{
+				informers: informerset{
+					service: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("GetByKey", "unit/svc-a").Return(&v1.Service{}, false, nil)
+							return idx
+						}())
+						return i
+					}(),
+				},
+				router: &mockTunnelRouter{},
+			},
+			service: resource{
+				namespace: "unit",
+				name:      "svc-a",
+			},
+			port:   intstr.FromInt(8080),
+			out:    0,
+			exists: false,
+			err:    fmt.Errorf("service 'unit/svc-a' does not exist"),
+		},
+		"service-lookup-error": {
+			tr: &syncTranslator{
+				informers: informerset{
+					service: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("GetByKey", "unit/svc-a").Return(&v1.Service{}, false, fmt.Errorf("lookup-error"))
+							return idx
+						}())
+						return i
+					}(),
+				},
+				router: &mockTunnelRouter{},
+			},
+			service: resource{
+				namespace: "unit",
+				name:      "svc-a",
+			},
+			port:   intstr.FromInt(8080),
+			out:    0,
+			exists: false,
+			err:    fmt.Errorf("lookup-error"),
+		},
+		"service-missing-port": {
+			tr: &syncTranslator{
+				informers: informerset{
+					service: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("GetByKey", "unit/svc-a").Return(&v1.Service{
+								Spec: v1.ServiceSpec{
+									Ports: []v1.ServicePort{
+										{
+											Name: "port-a",
+											Port: 8080,
+										},
+									},
+								},
+							}, true, nil)
+							return idx
+						}())
+						return i
+					}(),
+				},
+				router: &mockTunnelRouter{},
+			},
+			service: resource{
+				namespace: "unit",
+				name:      "svc-a",
+			},
+			port:   intstr.FromString("port-b"),
+			out:    0,
+			exists: false,
+			err:    fmt.Errorf("service 'unit/svc-a' missing port 'port-b'"),
+		},
+		"endpoints-do-not-exist": {
+			tr: &syncTranslator{
+				informers: informerset{
+					endpoint: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("GetByKey", "unit/svc-a").Return(&v1.Endpoints{}, false, nil)
+							return idx
+						}())
+						return i
+					}(),
+					service: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("GetByKey", "unit/svc-a").Return(&v1.Service{
+								Spec: v1.ServiceSpec{
+									Ports: []v1.ServicePort{
+										{
+											Name: "port-a",
+											Port: 8080,
+										},
+									},
+								},
+							}, true, nil)
+							return idx
+						}())
+						return i
+					}(),
+				},
+				router: &mockTunnelRouter{},
+			},
+			service: resource{
+				namespace: "unit",
+				name:      "svc-a",
+			},
+			port:   intstr.FromInt(8080),
+			out:    0,
+			exists: false,
+			err:    fmt.Errorf("endpoints 'unit/svc-a' do not exist"),
+		},
+		"endpoints-lookup-error": {
+			tr: &syncTranslator{
+				informers: informerset{
+					endpoint: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("GetByKey", "unit/svc-a").Return(&v1.Endpoints{}, false, fmt.Errorf("lookup-error"))
+							return idx
+						}())
+						return i
+					}(),
+					service: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("GetByKey", "unit/svc-a").Return(&v1.Service{
+								Spec: v1.ServiceSpec{
+									Ports: []v1.ServicePort{
+										{
+											Name: "port-a",
+											Port: 8080,
+										},
+									},
+								},
+							}, true, nil)
+							return idx
+						}())
+						return i
+					}(),
+				},
+				router: &mockTunnelRouter{},
+			},
+			service: resource{
+				namespace: "unit",
+				name:      "svc-a",
+			},
+			port:   intstr.FromInt(8080),
+			out:    0,
+			exists: false,
+			err:    fmt.Errorf("lookup-error"),
+		},
+		"endpoints-missing-subsets": {
+			tr: &syncTranslator{
+				informers: informerset{
+					endpoint: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("GetByKey", "unit/svc-a").Return(&v1.Endpoints{
+								Subsets: []v1.EndpointSubset{},
+							}, true, nil)
+							return idx
+						}())
+						return i
+					}(),
+					service: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("GetByKey", "unit/svc-a").Return(&v1.Service{
+								Spec: v1.ServiceSpec{
+									Ports: []v1.ServicePort{
+										{
+											Name: "port-a",
+											Port: 8080,
+										},
+									},
+								},
+							}, true, nil)
+							return idx
+						}())
+						return i
+					}(),
+				},
+				router: &mockTunnelRouter{},
+			},
+			service: resource{
+				namespace: "unit",
+				name:      "svc-a",
+			},
+			port:   intstr.FromInt(8080),
+			out:    0,
+			exists: false,
+			err:    fmt.Errorf("endpoints 'unit/svc-a' missing subsets"),
+		},
+		"service-endpoints-okay": {
+			tr: &syncTranslator{
+				informers: informerset{
+					endpoint: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("GetByKey", "unit/svc-a").Return(&v1.Endpoints{
+								Subsets: []v1.EndpointSubset{
+									{
+										Addresses: []v1.EndpointAddress{
+											{
+												IP: "x.x.x.x",
+											},
+										},
+										Ports: []v1.EndpointPort{
+											{
+												Name: "port-a",
+												Port: 8080,
+											},
+										},
+									},
+								},
+							}, true, nil)
+							return idx
+						}())
+						return i
+					}(),
+					service: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("GetByKey", "unit/svc-a").Return(&v1.Service{
+								Spec: v1.ServiceSpec{
+									Ports: []v1.ServicePort{
+										{
+											Name: "port-a",
+											Port: 8080,
+										},
+									},
+								},
+							}, true, nil)
+							return idx
+						}())
+						return i
+					}(),
+				},
+				router: &mockTunnelRouter{},
+			},
+			service: resource{
+				namespace: "unit",
+				name:      "svc-a",
+			},
+			port:   intstr.FromInt(8080),
+			out:    8080,
+			exists: true,
+			err:    nil,
+		},
+	} {
+		out, exists, err := test.tr.getVerifiedPort(test.service.namespace, test.service.name, test.port)
+		assert.Equalf(t, test.out, out, "test '%s' port mismatch", name)
+		assert.Equalf(t, test.exists, exists, "test '%s' exists mismatch", name)
+		assert.Equalf(t, test.err, err, "test '%s' error mismatch", name)
+	}
+}
 
 func newMockedSyncTranslator() *syncTranslator {
 	return &syncTranslator{

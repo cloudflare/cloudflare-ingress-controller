@@ -3,6 +3,8 @@ package argotunnel
 import (
 	"bytes"
 	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"net"
 	"net/http"
@@ -203,6 +205,41 @@ func newLinkHTTPTransport() *http.Transport {
 
 func getOriginURL(rule tunnelRule) (url string) {
 	url = fmt.Sprintf("%s.%s:%d", rule.service.name, rule.service.namespace, rule.port)
+	return
+}
+
+func verifyCertForHost(val []byte, host string) (err error) {
+	certpem, err := func() (cert []byte, err error) {
+		exists := false
+		raw := val
+		for {
+			block, rest := pem.Decode(raw)
+			if block == nil {
+				err = fmt.Errorf("pem decode failed")
+				break
+			}
+			if block.Type == "CERTIFICATE" {
+				cert = block.Bytes
+				exists = true
+				break
+			}
+			raw = rest
+		}
+		if !exists {
+			err = fmt.Errorf("pem contains no certificate")
+		}
+		return
+	}()
+	if err != nil {
+		return
+	}
+
+	x509cert, err := x509.ParseCertificate(certpem)
+	if err != nil {
+		return
+	}
+
+	err = x509cert.VerifyHostname(host)
 	return
 }
 

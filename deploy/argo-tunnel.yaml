@@ -15,6 +15,7 @@ rules:
   resources:
   - ingresses
   - services
+  - secrets
   - endpoints
   verbs:
   - list
@@ -28,32 +29,6 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: argo-tunnel
-subjects:
-- kind: ServiceAccount
-  name: argo-tunnel
-  namespace: default
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: argo-tunnel
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - list
-  - get
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: argo-tunnel
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
   name: argo-tunnel
 subjects:
 - kind: ServiceAccount
@@ -89,8 +64,7 @@ spec:
         args:
         - --incluster
         - --ingress-class=argo-tunnel
-        - --default-origin-secret=$(POD_NAMESPACE)/anydomain
-        - --v=2
+        - --v=3
         env:
         - name: POD_NAMESPACE
           valueFrom:

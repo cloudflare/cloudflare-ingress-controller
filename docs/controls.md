@@ -20,10 +20,12 @@
 - `argo.cloudflare.com/lb-pool`: attach a Cloudflare loadbalancer for high-availability
   - load-balancing must be enabled for the Cloudflare account
   - allows balancing traffic across clusters
+  - **required** if replicas > 1
 - `argo.cloudflare.com/no-chunked-encoding`: disables chunked transfer encoding; useful if you are running a WSGI server
   - defaults to `"false"`
 - `argo.cloudflare.com/retries`: maximum number of retries for connection/protocol errors.
-  - defaults to `"5"`
+  - defaults to `"3"`
 
-### Secret Labels
-- `cloudflare-argo/domain`: the label is required to pair a secret with a domain
+### Command-Line Options
+- `--default-origin-secret`: the default certificate used to establish tunnels
+  - any tunnel that does not specify a secret will use this default.

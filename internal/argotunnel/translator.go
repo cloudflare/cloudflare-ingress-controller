@@ -280,7 +280,7 @@ func (t *syncTranslator) getVerifiedPort(namespace, name string, port intstr.Int
 		return
 	}
 
-	v, exists := k8s.GetServicePort(obj.(*v1.Service), port)
+	svcport, exists := k8s.GetServicePort(obj.(*v1.Service), port)
 	if !exists {
 		err = fmt.Errorf("service '%s' missing port '%s'", key, port.String())
 		return
@@ -294,13 +294,12 @@ func (t *syncTranslator) getVerifiedPort(namespace, name string, port intstr.Int
 		return
 	}
 
-	exists = k8s.EndpointsHaveSubsets(obj.(*v1.Endpoints))
+	_, exists = k8s.GetEndpointsPort(obj.(*v1.Endpoints), svcport.TargetPort)
 	if !exists {
 		err = fmt.Errorf("endpoints '%s' missing subsets", key)
 		return
 	}
 
-	// TODO: verify that the service port matches subset ports
-	val = v
+	val = svcport.Port
 	return
 }

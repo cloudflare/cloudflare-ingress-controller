@@ -166,10 +166,10 @@ func TestGetRouteFromIngress(t *testing.T) {
 							idx.On("GetByKey", "unit/svc-a").Return(&v1.Endpoints{
 								Subsets: []v1.EndpointSubset{
 									{
-										Addresses: []v1.EndpointAddress{
+										Ports: []v1.EndpointPort{
 											{
-												IP:       "x.x.x.x",
-												Hostname: "a.unit.com",
+												Name: "http",
+												Port: 9090,
 											},
 										},
 									},
@@ -201,8 +201,9 @@ func TestGetRouteFromIngress(t *testing.T) {
 								Spec: v1.ServiceSpec{
 									Ports: []v1.ServicePort{
 										{
-											Name: "http",
-											Port: 8080,
+											Name:       "http",
+											Port:       8080,
+											TargetPort: intstr.FromInt(9090),
 										},
 									},
 								},
@@ -646,15 +647,10 @@ func TestGetVerifiedPort(t *testing.T) {
 							idx.On("GetByKey", "unit/svc-a").Return(&v1.Endpoints{
 								Subsets: []v1.EndpointSubset{
 									{
-										Addresses: []v1.EndpointAddress{
-											{
-												IP: "x.x.x.x",
-											},
-										},
 										Ports: []v1.EndpointPort{
 											{
 												Name: "port-a",
-												Port: 8080,
+												Port: 9090,
 											},
 										},
 									},
@@ -672,8 +668,9 @@ func TestGetVerifiedPort(t *testing.T) {
 								Spec: v1.ServiceSpec{
 									Ports: []v1.ServicePort{
 										{
-											Name: "port-a",
-											Port: 8080,
+											Name:       "port-a",
+											Port:       8080,
+											TargetPort: intstr.FromInt(9090),
 										},
 									},
 								},

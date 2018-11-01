@@ -10,16 +10,26 @@ const (
 	CertPem = "cert.pem"
 )
 
-// EndpointsHaveSubsets verify that subsets exist
-func EndpointsHaveSubsets(ep *v1.Endpoints) bool {
+// GetEndpointsPort extracts the matching endpoints port
+func GetEndpointsPort(ep *v1.Endpoints, port intstr.IntOrString) (val v1.EndpointPort, exists bool) {
 	if ep != nil {
 		for _, subset := range ep.Subsets {
-			if len(subset.Addresses) > 0 {
-				return true
+			for _, subsetPort := range subset.Ports {
+				switch port.Type {
+				case intstr.Int:
+					if subsetPort.Port == port.IntVal {
+						return subsetPort, true
+					}
+				case intstr.String:
+					if subsetPort.Name == port.StrVal {
+						return subsetPort, true
+					}
+				}
+
 			}
 		}
 	}
-	return false
+	return
 }
 
 // GetSecretCert extracts the 'cert.pem' from a secret
@@ -30,18 +40,18 @@ func GetSecretCert(sec *v1.Secret) (cert []byte, exists bool) {
 	return
 }
 
-// GetServicePort extracts the port defined by a service
-func GetServicePort(svc *v1.Service, port intstr.IntOrString) (val int32, exists bool) {
+// GetServicePort extracts the matching service port
+func GetServicePort(svc *v1.Service, port intstr.IntOrString) (val v1.ServicePort, exists bool) {
 	if svc != nil {
 		for _, servicePort := range svc.Spec.Ports {
 			switch port.Type {
 			case intstr.Int:
 				if servicePort.Port == port.IntVal {
-					return servicePort.Port, true
+					return servicePort, true
 				}
 			case intstr.String:
 				if servicePort.Name == port.StrVal {
-					return servicePort.Port, true
+					return servicePort, true
 				}
 			}
 		}

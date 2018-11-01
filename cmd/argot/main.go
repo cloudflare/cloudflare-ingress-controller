@@ -45,7 +45,9 @@ func main() {
 	ingressclass := couple.Flag("ingress-class", "ingress class name").Default(argotunnel.IngressClassDefault).String()
 	originsecret := k8s.ObjMixin(couple.Flag("default-origin-secret", "default origin certificate secret <namespace>/<name>"))
 	debugaddr := couple.Flag("debug-address", "profiling bind address").Default("127.0.0.1:8081").String()
+	debugenable := couple.Flag("debug-enable", "enable profiling handler").Bool()
 	metricsaddr := couple.Flag("metrics-address", "metrics bind address").Default("0.0.0.0:8080").String()
+	metricsenable := couple.Flag("metrics-enable", "enable metrics handler").Bool()
 	connlimit := couple.Flag("connection-limit", "profiling bind address").Default("512").Int()
 
 	args := os.Args[1:]
@@ -65,12 +67,6 @@ func main() {
 		log.SetLevel(logruslevel(*verbose))
 		log.Out = os.Stderr
 
-		promregistry := prometheus.NewRegistry()
-		promregistry.MustRegister(
-			prometheus.NewProcessCollector(os.Getpid(), ""),
-			prometheus.NewGoCollector(),
-		)
-
 		var g run.Group
 		{
 			ctx, cancel := context.WithCancel(context.Background())
@@ -89,7 +85,7 @@ func main() {
 				cancel()
 			})
 		}
-		{
+		if *debugenable {
 			debugServerMux := http.NewServeMux()
 			debugServerMux.HandleFunc("/debug/pprof/", pprof.Index)
 			debugServerMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
@@ -117,7 +113,16 @@ func main() {
 				debugServer.Shutdown(context.Background())
 			})
 		}
-		{
+		if *metricsenable {
+			// TODO: replace cloudflared metrics with go-kit metrics
+			// cloudflared metrics currently assumes prometheus, uses the global registry
+			// and does not differential by tunnel (e.g. assumes a daemon per tunnel)
+			promregistry := prometheus.NewRegistry()
+			promregistry.MustRegister(
+				prometheus.NewProcessCollector(os.Getpid(), ""),
+				prometheus.NewGoCollector(),
+			)
+
 			metricServerMux := http.NewServeMux()
 			metricServerMux.Handle("/metrics", promhttp.HandlerFor(promregistry, promhttp.HandlerOpts{}))
 

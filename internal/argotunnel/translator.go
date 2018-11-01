@@ -7,6 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -146,6 +147,7 @@ func (t *syncTranslator) deleteIngress(key string) (err error) {
 }
 
 func (t *syncTranslator) getRouteFromIngress(ing *v1beta1.Ingress) (r *tunnelRoute) {
+	// TODO: update function to allow specific failure detection for testing
 	switch {
 	case ing == nil:
 		return
@@ -176,71 +178,51 @@ func (t *syncTranslator) getRouteFromIngress(ing *v1beta1.Ingress) (r *tunnelRou
 			}
 			return nil
 		}()
+
+		// secret
+		var cert []byte
+		{
+			var err error
+			var exists bool
+			if secret == nil {
+				t.log.Warnf("translator secret not defined on ingress: %s, host: %s", ingkey, host)
+				continue
+			}
+			cert, exists, err = t.getVerifiedCert(secret.namespace, secret.name, host)
+			if err != nil {
+				t.log.Errorf("translator secret issue on ingress: %s, host: %s, err: %v", ingkey, host, err)
+				continue
+			} else if !exists {
+				t.log.Warnf("translator secret missing cert on ingress: %s, host: %s", ingkey, host)
+				continue
+			}
+		}
+
 		for _, path := range rule.HTTP.Paths {
-			// ingress rule path
+			// ingress
 			if len(path.Path) > 0 {
 				t.log.Warnf("translator path routing not supported on ingress: %s, host: %s, path: %+v", ingkey, host, path)
 				continue
 			}
-
-			// service
 			if len(path.Backend.ServiceName) == 0 {
 				t.log.Warnf("translator service empty on ingress: %s, host: %s, path: %+v", ingkey, host, path)
 				continue
 			}
-			key := itemKeyFunc(ing.Namespace, path.Backend.ServiceName)
-			obj, exists, err := t.informers.service.GetIndexer().GetByKey(key)
-			if err != nil {
-				t.log.Errorf("translator service lookup failed on ingress: %s, host: %s, path: %+v, err: %v", ingkey, host, path, err)
-				continue
-			} else if !exists {
-				t.log.Warnf("translator service missing on ingress: %s, host: %s, path: %+v", ingkey, host, path)
-				continue
-			}
-			port, exists := k8s.GetServicePort(obj.(*v1.Service), path.Backend.ServicePort)
-			if !exists {
-				t.log.Warnf("translator service port missing on ingress: %s, host: %s, path: %+v", ingkey, host, path)
-				continue
-			}
 
-			// endpoints
-			obj, exists, err = t.informers.endpoint.GetIndexer().GetByKey(key)
-			if err != nil {
-				t.log.Errorf("translator endpoints lookup failed on ingress: %s, host: %s, path: %+v, err: %v", ingkey, host, path, err)
-				continue
-			} else if !exists {
-				t.log.Warnf("translator endpoints missing on ingress: %s, host: %s, path: %+v", ingkey, host, path)
-				continue
+			// service
+			var port int32
+			{
+				var err error
+				var exists bool
+				port, exists, err = t.getVerifiedPort(ing.Namespace, path.Backend.ServiceName, path.Backend.ServicePort)
+				if err != nil {
+					t.log.Errorf("translator service issue on ingress: %s, host: %s, path: %+v, err: %q", ingkey, host, path, err)
+					continue
+				} else if !exists {
+					t.log.Warnf("translator service missing port on ingress: %s, host: %s, path: %+v", ingkey, host, path)
+					continue
+				}
 			}
-			if ok := k8s.EndpointsHaveSubsets(obj.(*v1.Endpoints)); !ok {
-				t.log.Warnf("translator endpoint subsets missing on ingress: %s, host: %s, path: %+v", ingkey, host, path)
-				continue
-			}
-
-			// TODO: verify that the service port matches subset ports
-
-			// secret
-			if secret == nil {
-				t.log.Warnf("translator secret not defined on ingress: %s, host: %s, path: %+v", ingkey, host, path)
-				continue
-			}
-			key = itemKeyFunc(secret.namespace, secret.name)
-			obj, exists, err = t.informers.secret.GetIndexer().GetByKey(key)
-			if err != nil {
-				t.log.Errorf("translator secret lookup failed on ingress: %s, host: %s, path: %+v, err: %v", ingkey, host, path, err)
-				continue
-			} else if !exists {
-				t.log.Warnf("translator secret missing on ingress: %s, host: %s, path: %+v", ingkey, host, path)
-				continue
-			}
-			cert, exists := k8s.GetSecretCert(obj.(*v1.Secret))
-			if !exists {
-				t.log.Warnf("translator secret 'cert.pem' missing on ingress: %s, host: %s, path: %+v", ingkey, host, path)
-				continue
-			}
-
-			// TODO: validate certificate against host
-			// https://golang.org/pkg/crypto/x509/#Certificate.VerifyHostnam
 
 			// attach rule|link to route
 			rule := tunnelRule{
@@ -262,5 +244,63 @@ func (t *syncTranslator) getRouteFromIngress(ing *v1beta1.Ingress) (r *tunnelRou
 		options:   opts,
 		links:     linkmap,
 	}
+	return
+}
+
+func (t *syncTranslator) getVerifiedCert(namespace, name, host string) (cert []byte, exists bool, err error) {
+	key := itemKeyFunc(namespace, name)
+	obj, exists, err := t.informers.secret.GetIndexer().GetByKey(key)
+	if err != nil {
+		return
+	} else if !exists {
+		err = fmt.Errorf("secret '%s' does not exist", key)
+		return
+	}
+
+	cert, exists = k8s.GetSecretCert(obj.(*v1.Secret))
+	if !exists {
+		err = fmt.Errorf("secret '%s' missing 'cert.pem'", key)
+		return
+	}
+
+	err = verifyCertForHost(cert, host)
+	if err != nil {
+		cert = nil
+	}
+	return
+}
+
+func (t *syncTranslator) getVerifiedPort(namespace, name string, port intstr.IntOrString) (val int32, exists bool, err error) {
+	key := itemKeyFunc(namespace, name)
+	obj, exists, err := t.informers.service.GetIndexer().GetByKey(key)
+	if err != nil {
+		return
+	} else if !exists {
+		err = fmt.Errorf("service '%s' does not exist", key)
+		return
+	}
+
+	v, exists := k8s.GetServicePort(obj.(*v1.Service), port)
+	if !exists {
+		err = fmt.Errorf("service '%s' missing port '%s'", key, port.String())
+		return
+	}
+
+	obj, exists, err = t.informers.endpoint.GetIndexer().GetByKey(key)
+	if err != nil {
+		return
+	} else if !exists {
+		err = fmt.Errorf("endpoints '%s' do not exist", key)
+		return
+	}
+
+	exists = k8s.EndpointsHaveSubsets(obj.(*v1.Endpoints))
+	if !exists {
+		err = fmt.Errorf("endpoints '%s' missing subsets", key)
+		return
+	}
+
+	// TODO: verify that the service port matches subset ports
+	val = v
 	return
 }

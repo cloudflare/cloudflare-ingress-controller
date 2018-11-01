@@ -8,50 +8,183 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-func TestEndpointsHaveSubsets(t *testing.T) {
+func TestGetEndpointsPort(t *testing.T) {
 	t.Parallel()
 	for name, test := range map[string]struct {
-		in *v1.Endpoints
-		ok bool
+		obj  *v1.Endpoints
+		port intstr.IntOrString
+		out  v1.EndpointPort
+		ok   bool
 	}{
 		"endpoints-nil": {
-			in: nil,
-			ok: false,
+			obj:  nil,
+			port: intstr.FromInt(80),
+			out:  v1.EndpointPort{},
+			ok:   false,
 		},
 		"endpoints-empty": {
-			in: &v1.Endpoints{},
-			ok: false,
+			obj:  nil,
+			port: intstr.FromInt(80),
+			out:  v1.EndpointPort{},
+			ok:   false,
 		},
-		"endpoints-no-subsets": {
-			in: &v1.Endpoints{
+		"endpoints-no-ports": {
+			obj: &v1.Endpoints{
 				Subsets: []v1.EndpointSubset{
 					{
-						Addresses: []v1.EndpointAddress{},
+						Ports: []v1.EndpointPort{},
 					},
 					{
-						Addresses: []v1.EndpointAddress{},
+						Ports: []v1.EndpointPort{},
 					},
 				},
 			},
-			ok: false,
+			port: intstr.FromInt(80),
+			out:  v1.EndpointPort{},
+			ok:   false,
 		},
-		"endpoints-have-subsets": {
-			in: &v1.Endpoints{
+		"endpoints-no-str-port": {
+			obj: &v1.Endpoints{
 				Subsets: []v1.EndpointSubset{
 					{
-						Addresses: []v1.EndpointAddress{
+						Ports: []v1.EndpointPort{
 							{
-								IP: "1.1.1.1",
+								Name: "unit-a",
+								Port: 8080,
+							},
+							{
+								Name: "unit-b",
+								Port: 9090,
+							},
+						},
+					},
+					{
+						Ports: []v1.EndpointPort{
+							{
+								Name: "unit-c",
+								Port: 8081,
+							},
+							{
+								Name: "unit-d",
+								Port: 9091,
 							},
 						},
 					},
 				},
 			},
+			port: intstr.FromString("http"),
+			out:  v1.EndpointPort{},
+			ok:   false,
+		},
+		"endpoints-no-int-port": {
+			obj: &v1.Endpoints{
+				Subsets: []v1.EndpointSubset{
+					{
+						Ports: []v1.EndpointPort{
+							{
+								Name: "http-a",
+								Port: 8080,
+							},
+							{
+								Name: "unit-b",
+								Port: 9090,
+							},
+						},
+					},
+					{
+						Ports: []v1.EndpointPort{
+							{
+								Name: "unit-c",
+								Port: 8081,
+							},
+							{
+								Name: "unit-d",
+								Port: 9091,
+							},
+						},
+					},
+				},
+			},
+			port: intstr.FromInt(80),
+			out:  v1.EndpointPort{},
+			ok:   false,
+		},
+		"endpoints-has-str-port": {
+			obj: &v1.Endpoints{
+				Subsets: []v1.EndpointSubset{
+					{
+						Ports: []v1.EndpointPort{
+							{
+								Name: "http",
+								Port: 8080,
+							},
+							{
+								Name: "grpc",
+								Port: 9090,
+							},
+						},
+					},
+					{
+						Ports: []v1.EndpointPort{
+							{
+								Name: "metrics",
+								Port: 8081,
+							},
+							{
+								Name: "pprof",
+								Port: 9091,
+							},
+						},
+					},
+				},
+			},
+			port: intstr.FromString("pprof"),
+			out: v1.EndpointPort{
+				Name: "pprof",
+				Port: 9091,
+			},
+			ok: true,
+		},
+		"endpoints-has-int-port": {
+			obj: &v1.Endpoints{
+				Subsets: []v1.EndpointSubset{
+					{
+						Ports: []v1.EndpointPort{
+							{
+								Name: "http",
+								Port: 8080,
+							},
+							{
+								Name: "grpc",
+								Port: 9090,
+							},
+						},
+					},
+					{
+						Ports: []v1.EndpointPort{
+							{
+								Name: "metrics",
+								Port: 8081,
+							},
+							{
+								Name: "pprof",
+								Port: 9091,
+							},
+						},
+					},
+				},
+			},
+			port: intstr.FromInt(9090),
+			out: v1.EndpointPort{
+				Name: "grpc",
+				Port: 9090,
+			},
 			ok: true,
 		},
 	} {
-		ok := EndpointsHaveSubsets(test.in)
-		assert.Equalf(t, test.ok, ok, "test '%s' condition mismatch", name)
+		out, ok := GetEndpointsPort(test.obj, test.port)
+		assert.Equalf(t, test.out, out, "test '%s' value mismatch", name)
+		assert.Equalf(t, test.ok, ok, "test '%s' exists mismatch", name)
 	}
 }
 
@@ -102,19 +235,19 @@ func TestGetServicePort(t *testing.T) {
 	for name, test := range map[string]struct {
 		obj  *v1.Service
 		port intstr.IntOrString
-		out  int32
+		out  v1.ServicePort
 		ok   bool
 	}{
 		"service-nil": {
 			obj:  nil,
 			port: intstr.FromInt(80),
-			out:  0,
+			out:  v1.ServicePort{},
 			ok:   false,
 		},
 		"service-empty": {
 			obj:  &v1.Service{},
 			port: intstr.FromInt(80),
-			out:  0,
+			out:  v1.ServicePort{},
 			ok:   false,
 		},
 		"service-no-ports": {
@@ -123,7 +256,7 @@ func TestGetServicePort(t *testing.T) {
 					Ports: []v1.ServicePort{},
 				},
 			},
-			out: 0,
+			out: v1.ServicePort{},
 			ok:  false,
 		},
 		"service-no-str-port": {
@@ -142,7 +275,7 @@ func TestGetServicePort(t *testing.T) {
 				},
 			},
 			port: intstr.FromString("http"),
-			out:  0,
+			out:  v1.ServicePort{},
 			ok:   false,
 		},
 		"service-no-int-port": {
@@ -161,7 +294,7 @@ func TestGetServicePort(t *testing.T) {
 				},
 			},
 			port: intstr.FromInt(80),
-			out:  0,
+			out:  v1.ServicePort{},
 			ok:   false,
 		},
 		"service-has-str-port": {
@@ -180,8 +313,11 @@ func TestGetServicePort(t *testing.T) {
 				},
 			},
 			port: intstr.FromString("http"),
-			out:  8080,
-			ok:   true,
+			out: v1.ServicePort{
+				Name: "http",
+				Port: 8080,
+			},
+			ok: true,
 		},
 		"service-has-int-port": {
 			obj: &v1.Service{
@@ -199,8 +335,11 @@ func TestGetServicePort(t *testing.T) {
 				},
 			},
 			port: intstr.FromInt(9090),
-			out:  9090,
-			ok:   true,
+			out: v1.ServicePort{
+				Name: "grpc",
+				Port: 9090,
+			},
+			ok: true,
 		},
 	} {
 		out, ok := GetServicePort(test.obj, test.port)

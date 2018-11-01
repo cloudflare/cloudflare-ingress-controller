@@ -29,15 +29,15 @@ zone credentials.
 [Follow these instructions to install cloudflared][argo-tunnel-daemon]
 
 Once installed, verify cloudflared has installed properly by checking the version.
-```bash
+```console
 cloudflared --version
 ```
 
 ### Step 3: Login to your Cloudflare account
-```bash
+```console
 cloudflared login
 ```
-_If the browser fails to open automatically, copy and paste the URL into your 
+> _If the browser fails to open automatically, copy and paste the URL into your 
 browser’s address bar and press enter._
 
 Once you login, you will see a list of domains associated with your account.
@@ -47,45 +47,35 @@ which will be downloaded automatically by your browser. This certificate will
 be used to authenticate your machine to the Cloudflare edge.
 
 Move the certificate to the ```.cloudflared``` directory on your system.
-```bash
+```console
 mv cert.pem ~/.cloudflared/cert.pem
 ```
 
 The certificate and domain will be used to define an Ingress to your system.
 
 ### Step 4: Deploy a Tunnel Secret
-```bash
+```console
 kubectl create secret generic mydomain.com --from-file="$HOME/.cloudflared/cert.pem"
-kubectl label secret mydomain.com "cloudflare-argo/domain=mydomain.com"
 ```
-> Create the secret in the same namespace as the controller deployment.
+> Create the secret in the **same namespace** as your service deployment.
 > Adjust `mydomain.com` to match your Cloudflare domain.
 
-A single controller can configure tunnels for multiple domains.
-
-**Caveats**:
-- the secret is paired to a domain using the label `cloudflare-argo/domain`
-- the secret must be co-located with the ingress controller deployment (e.g. deployed to the same namespace)
-
-> These caveats will be addressed in future releases.
+A single controller can configure tunnels for multiple domains. An [Ingress][kubernetes-ingress] definition will be used to defined tunnels to Services and link Secrets by external hostname.
 
 ### Step 5: Attach a Tunnel
-When the controller observes the creation of an ingress, it verifies that
+When the controller observes the creation of an [Ingress][kubernetes-ingress], it verifies that
 the referenced service, endpoints, and secret exists and opens a tunnel
 between the Cloudflare receiver and the kubernetes virtual service ip.
 
-```bash
+```console
 kubectl apply -f deploy/echo.yaml
 ```
 > Adjust the Ingress host `echo.mydomain.com` to match your Cloudflare domain.
 
 **Caveats**:
-- an Ingress is restricted to a single rule (`Ingress.spec.rules[0]`)
-- a rule is restricted to a single path (`Ingress.spec.rules[0].host.http.paths[0]`)
-- tls on the Ingress is not support (`Ingress.spec.tls`)
-- routing by path is not supported (`Ingress.spec.rules[0].host.http.paths[0].path`)
+- routing by path is not supported (`Ingress.spec.rules[*].host.http.paths[*].path`)
 
-> These caveats will be addressed in future releases.
+> This caveat will be addressed in future releases.
 
 ### Step 6: Verify the Tunnel
 The tunnel will be visible under [DNS][cloudflare-dashboard-dns] on the Cloudflare dashboard.
@@ -100,3 +90,4 @@ The tunnel will be visible under [DNS][cloudflare-dashboard-dns] on the Cloudfla
 [cloudflare-dashboard-traffic]: https://www.cloudflare.com/a/traffic/
 [cloudflare-login]: http://cloudflare.com/a/login
 [cloudflare-quick-start-step-2]: https://support.cloudflare.com/hc/en-us/articles/201720164-Step-2-Create-a-Cloudflare-account-and-add-a-websit
+[kubernetes-ingress]: https://kubernetes.io/docs/concepts/services-networking/ingress/

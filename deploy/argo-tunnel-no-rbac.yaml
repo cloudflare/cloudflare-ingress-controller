@@ -27,8 +27,7 @@ spec:
         args:
         - --incluster
         - --ingress-class=argo-tunnel
-        - --default-origin-secret=$(POD_NAMESPACE)/anydomain
-        - --v=2
+        - --v=3
         env:
         - name: POD_NAMESPACE
           valueFrom:

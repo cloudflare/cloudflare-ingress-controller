@@ -23,7 +23,7 @@ at [Argo Tunnel: Load-Balancing][cloudflare-reference-load-balancing]
 
 ### Step 2: Annotate the Ingress
 Add the annotation `argo.cloudflare.com/lb-pool=echo-lb-pool` the `echo` Ingress.
-```bash
+```console
 kubectl annotate ing echo "argo.cloudflare.com/lb-pool=echo-lb-pool"
 ```
 

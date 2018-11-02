@@ -49,6 +49,7 @@ func main() {
 	metricsaddr := couple.Flag("metrics-address", "metrics bind address").Default("0.0.0.0:8080").String()
 	metricsenable := couple.Flag("metrics-enable", "enable metrics handler").Bool()
 	connlimit := couple.Flag("connection-limit", "profiling bind address").Default("512").Int()
+	workers := couple.Flag("workers", "number of workers processing updates").Default(strconv.Itoa(argotunnel.WorkersDefault)).Int()
 
 	args := os.Args[1:]
 	switch kingpin.MustParse(app.Parse(args)) {
@@ -160,6 +161,7 @@ func main() {
 			argo := argotunnel.NewController(kclient, log,
 				argotunnel.IngressClass(*ingressclass),
 				argotunnel.Secret(originsecret.Name, originsecret.Namespace),
+				argotunnel.Workers(*workers),
 			)
 
 			g.Add(func() error {

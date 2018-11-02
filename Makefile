@@ -43,7 +43,7 @@ check: test-race vet fmt staticcheck unused misspell
 .PHONY: clean
 clean:
 	@echo cleaning build targets
-	@rm -rf bin .build coverage.txt
+	@rm -rf $(TMP_DIR) bin coverage.txt
 
 .PHONY: container
 container:

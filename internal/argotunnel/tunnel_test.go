@@ -14,6 +14,7 @@ import (
 
 	"github.com/cloudflare/cloudflared/origin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestTunnelLinkEquals(t *testing.T) {
@@ -278,4 +279,41 @@ func genCertforHost(host string) (cert []byte) {
 		Bytes: rawBytes,
 	})
 	return pemBytes
+}
+
+type mockTunnelLink struct {
+	mock.Mock
+}
+
+func (l *mockTunnelLink) host() string {
+	args := l.Called()
+	return args.Get(0).(string)
+}
+func (l *mockTunnelLink) routeRule() tunnelRule {
+	args := l.Called()
+	return args.Get(0).(tunnelRule)
+}
+func (l *mockTunnelLink) originURL() string {
+	args := l.Called()
+	return args.Get(0).(string)
+}
+func (l *mockTunnelLink) originCert() []byte {
+	args := l.Called()
+	return args.Get(0).([]byte)
+}
+func (l *mockTunnelLink) options() tunnelOptions {
+	args := l.Called()
+	return args.Get(0).(tunnelOptions)
+}
+func (l *mockTunnelLink) equal(obj tunnelLink) bool {
+	args := l.Called(obj)
+	return args.Get(0).(bool)
+}
+func (l *mockTunnelLink) start() error {
+	args := l.Called()
+	return args.Error(0)
+}
+func (l *mockTunnelLink) stop() error {
+	args := l.Called()
+	return args.Error(0)
 }

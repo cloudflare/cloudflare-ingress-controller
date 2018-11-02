@@ -15,7 +15,7 @@ const (
 	RequeueLimitDefault = 2
 
 	// WorkersDefault defines the default number of workers processing items from the queue
-	WorkersDefault = 1
+	WorkersDefault = 2
 )
 
 type options struct {

@@ -79,51 +79,54 @@ func (r *syncTunnelRouter) unsafeUpdateRoute(newRoute *tunnelRoute) (err error) 
 
 func (r *syncTunnelRouter) deleteByRoute(namespace, name string) (err error) {
 	r.log.Debugf("router delete route: %s/%s", namespace, name)
-	key := itemKeyFunc(namespace, name)
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	oldRoute, exists := r.items[key]
-	if !exists {
-		return
-	}
-
 	var wg wait.Group
-	delete(r.items, key)
-	for _, l := range oldRoute.links {
-		wg.Start(func(l tunnelLink) func() {
-			return func() {
-				l.stop()
-			}
-		}(l))
-	}
+	func() {
+		key := itemKeyFunc(namespace, name)
+
+		r.mu.Lock()
+		defer r.mu.Unlock()
+
+		oldRoute, exists := r.items[key]
+		if !exists {
+			return
+		}
+
+		delete(r.items, key)
+		for _, oldLink := range oldRoute.links {
+			wg.Start(stopLinkFunc(oldLink))
+		}
+	}()
+	wg.Wait()
 	return
 }
 
 func (r *syncTunnelRouter) deleteByKindKeys(kind, namespace, name string, keys []string) (err error) {
 	r.log.Debugf("router delete by %s: %s/%s", kind, namespace, name)
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	var wg wait.Group
+	func() {
+		r.mu.Lock()
+		defer r.mu.Unlock()
 
-	for _, key := range keys {
-		r.log.Debugf("router delete route: %s", key)
-		if oldRoute, exists := r.items[key]; exists {
-			oldLinks := oldRoute.links
-			newLinks := tunnelRouteLinkMap{}
-			for oldRule, oldLink := range oldLinks {
-				rc := getKindRuleResource(kind, oldRule)
-				if rc.namespace == namespace && rc.name == name {
-					oldLink.stop()
-				} else {
-					newLinks[oldRule] = oldLink
+		for _, key := range keys {
+			r.log.Debugf("router delete route: %s", key)
+			if oldRoute, exists := r.items[key]; exists {
+				oldLinks := oldRoute.links
+				newLinks := tunnelRouteLinkMap{}
+				for oldRule, oldLink := range oldLinks {
+					rc := getKindRuleResource(kind, oldRule)
+					if rc.namespace == namespace && rc.name == name {
+						wg.Start(stopLinkFunc(oldLink))
+					} else {
+						newLinks[oldRule] = oldLink
+					}
 				}
+				oldRoute.links = newLinks
+				r.items[key] = oldRoute
 			}
-			oldRoute.links = newLinks
-			r.items[key] = oldRoute
 		}
-	}
+	}()
+	wg.Wait()
 	return
 }
 
@@ -136,19 +139,18 @@ func (r *syncTunnelRouter) run(stopCh <-chan struct{}) (err error) {
 }
 
 func (r *syncTunnelRouter) halt() (err error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	var wg wait.Group
-	for _, c := range r.items {
-		for _, l := range c.links {
-			wg.Start(func(l tunnelLink) func() {
-				return func() {
-					l.stop()
-				}
-			}(l))
+	func() {
+		r.mu.RLock()
+		defer r.mu.RUnlock()
+
+		for _, c := range r.items {
+			for _, l := range c.links {
+				wg.Start(stopLinkFunc(l))
+			}
 		}
-	}
+	}()
+	wg.Wait()
 	return
 }
 
@@ -157,6 +159,12 @@ func newTunnelRouter(log *logrus.Logger, opts options) tunnelRouter {
 		items:   map[string]*tunnelRoute{},
 		log:     log,
 		options: opts,
+	}
+}
+
+func stopLinkFunc(link tunnelLink) func() {
+	return func() {
+		link.stop()
 	}
 }
 

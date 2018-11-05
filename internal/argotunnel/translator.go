@@ -66,9 +66,9 @@ func (t *syncTranslator) handleByKind(kind, key string) (err error) {
 	_, exists, err := indexer.GetByKey(key)
 	if err == nil {
 		if exists {
-			t.updateByKind(kind, key)
+			err = t.updateByKind(kind, key)
 		} else {
-			t.deleteByKind(kind, key)
+			err = t.deleteByKind(kind, key)
 		}
 	}
 	return
@@ -119,9 +119,9 @@ func (t *syncTranslator) handleIngress(kind, key string) (err error) {
 	obj, exists, err := t.informers.ingress.GetIndexer().GetByKey(key)
 	if err == nil {
 		if exists {
-			t.updateIngress(key, obj.(*v1beta1.Ingress))
+			err = t.updateIngress(key, obj.(*v1beta1.Ingress))
 		} else {
-			t.deleteIngress(key)
+			err = t.deleteIngress(key)
 		}
 	}
 	return

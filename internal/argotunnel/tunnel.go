@@ -29,7 +29,6 @@ const (
 type tunnelRoute struct {
 	name      string
 	namespace string
-	options   tunnelOptions
 	links     tunnelRouteLinkMap
 }
 

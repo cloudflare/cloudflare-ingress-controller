@@ -152,7 +152,6 @@ func TestGetRouteFromIngress(t *testing.T) {
 			out: &tunnelRoute{
 				name:      "unit",
 				namespace: "unit",
-				options:   collectTunnelOptions(parseIngressTunnelOptions(&v1beta1.Ingress{})),
 				links:     tunnelRouteLinkMap{},
 			},
 		},
@@ -258,7 +257,6 @@ func TestGetRouteFromIngress(t *testing.T) {
 			out: &tunnelRoute{
 				name:      "unit",
 				namespace: "unit",
-				options:   collectTunnelOptions(parseIngressTunnelOptions(&v1beta1.Ingress{})),
 				links: tunnelRouteLinkMap{
 					tunnelRule{
 						host: "a.unit.com",

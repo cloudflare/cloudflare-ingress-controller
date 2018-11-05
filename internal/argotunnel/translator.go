@@ -241,7 +241,6 @@ func (t *syncTranslator) getRouteFromIngress(ing *v1beta1.Ingress) (r *tunnelRou
 	r = &tunnelRoute{
 		name:      ing.Name,
 		namespace: ing.Namespace,
-		options:   opts,
 		links:     linkmap,
 	}
 	return

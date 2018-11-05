@@ -121,6 +121,109 @@ func TestHandleResource(t *testing.T) {
 	}
 }
 
+func TestHandleByKind(t *testing.T) {
+	t.Parallel()
+	for name, test := range map[string]struct {
+		tr   *syncTranslator
+		kind string
+		key  string
+		out  error
+	}{
+		"kind-unexpected": {
+			tr:   newMockedSyncTranslator(),
+			kind: "unit",
+			key:  "unit/unit",
+			out:  fmt.Errorf("unexpected kind (%q) in key (%q)", "unit", "unit/unit"),
+		},
+		"kind-secret-idx-err": {
+			tr: &syncTranslator{
+				informers: informerset{
+					endpoint: &mockSharedIndexInformer{},
+					ingress:  &mockSharedIndexInformer{},
+					secret: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("GetByKey", "unit/sec-a").Return(struct{}{}, false, fmt.Errorf("short-circuit"))
+							return idx
+						}())
+						return i
+					}(),
+					service: &mockSharedIndexInformer{},
+				},
+			},
+			kind: "secret",
+			key:  "unit/sec-a",
+			out:  fmt.Errorf("short-circuit"),
+		},
+		"kind-secret-idx-update-err": {
+			tr: &syncTranslator{
+				informers: informerset{
+					endpoint: &mockSharedIndexInformer{},
+					ingress: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("ByIndex", "secret", "unit/sec-a").Return(make([]interface{}, 0, 0), fmt.Errorf("short-circuit"))
+							return idx
+						}())
+						return i
+					}(),
+					secret: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("GetByKey", "unit/sec-a").Return(struct{}{}, true, nil)
+							return idx
+						}())
+						return i
+					}(),
+					service: &mockSharedIndexInformer{},
+				},
+			},
+			kind: "secret",
+			key:  "unit/sec-a",
+			out:  fmt.Errorf("short-circuit"),
+		},
+		"kind-secret-idx-delete-err": {
+			tr: &syncTranslator{
+				informers: informerset{
+					endpoint: &mockSharedIndexInformer{},
+					ingress: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("IndexKeys", "secret", "unit/sec-a").Return(make([]string, 0, 0), fmt.Errorf("short-circuit"))
+							return idx
+						}())
+						return i
+					}(),
+					secret: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("GetByKey", "unit/sec-a").Return(struct{}{}, false, nil)
+							return idx
+						}())
+						return i
+					}(),
+					service: &mockSharedIndexInformer{},
+				},
+			},
+			kind: "secret",
+			key:  "unit/sec-a",
+			out:  fmt.Errorf("short-circuit"),
+		},
+	} {
+		logger, hook := logtest.NewNullLogger()
+		test.tr.log = logger
+		out := test.tr.handleResource(test.kind, test.key)
+		assert.Equalf(t, test.out, out, "test '%s' error mismatch", name)
+		hook.Reset()
+		assert.Nil(t, hook.LastEntry())
+	}
+}
+
 func TestGetRouteFromIngress(t *testing.T) {
 	t.Parallel()
 	for name, test := range map[string]struct {

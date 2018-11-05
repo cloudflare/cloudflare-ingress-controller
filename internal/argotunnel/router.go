@@ -31,6 +31,7 @@ func (r *syncTunnelRouter) updateRoute(newRoute *tunnelRoute) (err error) {
 
 func (r *syncTunnelRouter) updateByKindRoutes(kind, namespace, name string, routes []*tunnelRoute) (err error) {
 	r.log.Debugf("router update by %s: %s/%s", kind, namespace, name)
+	// TODO: consider locking per-route (avoid long locks, but lock more often)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for _, newRoute := range routes {
@@ -105,6 +106,7 @@ func (r *syncTunnelRouter) deleteByKindKeys(kind, namespace, name string, keys [
 
 	var wg wait.Group
 	func() {
+		// TODO: consider locking per-route (avoid long locks, but lock more often)
 		r.mu.Lock()
 		defer r.mu.Unlock()
 

@@ -133,7 +133,7 @@ func TestHandleByKind(t *testing.T) {
 			tr:   newMockedSyncTranslator(),
 			kind: "unit",
 			key:  "unit/unit",
-			out:  fmt.Errorf("unexpected kind (%q) in key (%q)", "unit", "unit/unit"),
+			out:  fmt.Errorf("unexpected kind (%q)", "unit"),
 		},
 		"kind-secret-idx-err": {
 			tr: &syncTranslator{
@@ -217,7 +217,104 @@ func TestHandleByKind(t *testing.T) {
 	} {
 		logger, hook := logtest.NewNullLogger()
 		test.tr.log = logger
-		out := test.tr.handleResource(test.kind, test.key)
+		out := test.tr.handleByKind(test.kind, test.key)
+		assert.Equalf(t, test.out, out, "test '%s' error mismatch", name)
+		hook.Reset()
+		assert.Nil(t, hook.LastEntry())
+	}
+}
+
+func TestHandleEndpoint(t *testing.T) {
+	t.Parallel()
+	for name, test := range map[string]struct {
+		tr   *syncTranslator
+		kind string
+		key  string
+		out  error
+	}{
+		"kind-endpoint-idx-err": {
+			tr: &syncTranslator{
+				informers: informerset{
+					endpoint: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("GetByKey", "unit/svc-a").Return(struct{}{}, false, fmt.Errorf("short-circuit"))
+							return idx
+						}())
+						return i
+					}(),
+					ingress: &mockSharedIndexInformer{},
+					secret:  &mockSharedIndexInformer{},
+					service: &mockSharedIndexInformer{},
+				},
+			},
+			kind: "endpoint",
+			key:  "unit/svc-a",
+			out:  fmt.Errorf("short-circuit"),
+		},
+		"kind-endpoint-idx-update-err": {
+			tr: &syncTranslator{
+				informers: informerset{
+					endpoint: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("GetByKey", "unit/svc-a").Return(struct{}{}, true, nil)
+							return idx
+						}())
+						return i
+					}(),
+					ingress: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("ByIndex", "service", "unit/svc-a").Return(make([]interface{}, 0, 0), fmt.Errorf("short-circuit"))
+							return idx
+						}())
+						return i
+					}(),
+					secret:  &mockSharedIndexInformer{},
+					service: &mockSharedIndexInformer{},
+				},
+			},
+			kind: "endpoint",
+			key:  "unit/svc-a",
+			out:  fmt.Errorf("short-circuit"),
+		},
+		"kind-secret-idx-delete-err": {
+			tr: &syncTranslator{
+				informers: informerset{
+					endpoint: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("GetByKey", "unit/svc-a").Return(struct{}{}, false, nil)
+							return idx
+						}())
+						return i
+					}(),
+					ingress: func() cache.SharedIndexInformer {
+						i := &mockSharedIndexInformer{}
+						i.On("GetIndexer").Return(func() cache.Indexer {
+							idx := &mockIndexer{}
+							idx.On("IndexKeys", "service", "unit/svc-a").Return(make([]string, 0, 0), fmt.Errorf("short-circuit"))
+							return idx
+						}())
+						return i
+					}(),
+					secret:  &mockSharedIndexInformer{},
+					service: &mockSharedIndexInformer{},
+				},
+			},
+			kind: "secret",
+			key:  "unit/svc-a",
+			out:  fmt.Errorf("short-circuit"),
+		},
+	} {
+		logger, hook := logtest.NewNullLogger()
+		test.tr.log = logger
+		out := test.tr.handleEndpoint(test.kind, test.key)
 		assert.Equalf(t, test.out, out, "test '%s' error mismatch", name)
 		hook.Reset()
 		assert.Nil(t, hook.LastEntry())
@@ -270,8 +367,9 @@ func TestGetRouteFromIngress(t *testing.T) {
 									{
 										Ports: []v1.EndpointPort{
 											{
-												Name: "http",
-												Port: 9090,
+												Name:     "http",
+												Port:     9090,
+												Protocol: v1.ProtocolTCP,
 											},
 										},
 									},
@@ -306,6 +404,7 @@ func TestGetRouteFromIngress(t *testing.T) {
 											Name:       "http",
 											Port:       8080,
 											TargetPort: intstr.FromInt(9090),
+											Protocol:   v1.ProtocolTCP,
 										},
 									},
 								},
@@ -588,8 +687,9 @@ func TestGetVerifiedPort(t *testing.T) {
 								Spec: v1.ServiceSpec{
 									Ports: []v1.ServicePort{
 										{
-											Name: "port-a",
-											Port: 8080,
+											Name:     "port-a",
+											Port:     8080,
+											Protocol: v1.ProtocolTCP,
 										},
 									},
 								},
@@ -630,8 +730,9 @@ func TestGetVerifiedPort(t *testing.T) {
 								Spec: v1.ServiceSpec{
 									Ports: []v1.ServicePort{
 										{
-											Name: "port-a",
-											Port: 8080,
+											Name:     "port-a",
+											Port:     8080,
+											Protocol: v1.ProtocolTCP,
 										},
 									},
 								},
@@ -672,8 +773,9 @@ func TestGetVerifiedPort(t *testing.T) {
 								Spec: v1.ServiceSpec{
 									Ports: []v1.ServicePort{
 										{
-											Name: "port-a",
-											Port: 8080,
+											Name:     "port-a",
+											Port:     8080,
+											Protocol: v1.ProtocolTCP,
 										},
 									},
 								},
@@ -716,8 +818,9 @@ func TestGetVerifiedPort(t *testing.T) {
 								Spec: v1.ServiceSpec{
 									Ports: []v1.ServicePort{
 										{
-											Name: "port-a",
-											Port: 8080,
+											Name:     "port-a",
+											Port:     8080,
+											Protocol: v1.ProtocolTCP,
 										},
 									},
 								},
@@ -750,8 +853,9 @@ func TestGetVerifiedPort(t *testing.T) {
 									{
 										Ports: []v1.EndpointPort{
 											{
-												Name: "port-a",
-												Port: 9090,
+												Name:     "port-a",
+												Port:     9090,
+												Protocol: v1.ProtocolTCP,
 											},
 										},
 									},
@@ -772,6 +876,7 @@ func TestGetVerifiedPort(t *testing.T) {
 											Name:       "port-a",
 											Port:       8080,
 											TargetPort: intstr.FromInt(9090),
+											Protocol:   v1.ProtocolTCP,
 										},
 									},
 								},

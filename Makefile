@@ -131,7 +131,7 @@ test: install
 .PHONY: test-race
 test-race: | test
 	@echo testing code for races
-	@go test -coverprofile=coverage.txt -covermode=atomic -race ./...
+	@go test -race ./...
 
 .PHONY: unused
 unused:

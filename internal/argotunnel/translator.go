@@ -45,7 +45,7 @@ func (t *syncTranslator) waitForCacheSync(stopCh <-chan struct{}) (ok bool) {
 
 func (t *syncTranslator) handleResource(kind, key string) (err error) {
 	handlerFuncs := map[string]func(kind, key string) error{
-		endpointKind: t.handleByKind,
+		endpointKind: t.handleEndpoint,
 		ingressKind:  t.handleIngress,
 		secretKind:   t.handleByKind,
 		serviceKind:  t.handleByKind,
@@ -54,6 +54,18 @@ func (t *syncTranslator) handleResource(kind, key string) (err error) {
 		err = handlerFunc(kind, key)
 	} else {
 		err = fmt.Errorf("unexpected kind (%q) in key (%q)", kind, key)
+	}
+	return
+}
+
+func (t *syncTranslator) handleEndpoint(kind, key string) (err error) {
+	_, exists, err := t.informers.endpoint.GetIndexer().GetByKey(key)
+	if err == nil {
+		if exists {
+			err = t.updateByKind(serviceKind, key)
+		} else {
+			err = t.deleteByKind(serviceKind, key)
+		}
 	}
 	return
 }
@@ -279,7 +291,7 @@ func (t *syncTranslator) getVerifiedPort(namespace, name string, port intstr.Int
 		return
 	}
 
-	svcport, exists := k8s.GetServicePort(obj.(*v1.Service), port)
+	svcport, exists := k8s.GetServicePort(obj.(*v1.Service), port, v1.ProtocolTCP)
 	if !exists {
 		err = fmt.Errorf("service '%s' missing port '%s'", key, port.String())
 		return
@@ -293,7 +305,7 @@ func (t *syncTranslator) getVerifiedPort(namespace, name string, port intstr.Int
 		return
 	}
 
-	_, exists = k8s.GetEndpointsPort(obj.(*v1.Endpoints), svcport.TargetPort)
+	_, exists = k8s.GetEndpointsPort(obj.(*v1.Endpoints), svcport.TargetPort, v1.ProtocolTCP)
 	if !exists {
 		err = fmt.Errorf("endpoints '%s' missing subsets", key)
 		return

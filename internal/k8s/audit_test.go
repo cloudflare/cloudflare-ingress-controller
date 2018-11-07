@@ -11,22 +11,25 @@ import (
 func TestGetEndpointsPort(t *testing.T) {
 	t.Parallel()
 	for name, test := range map[string]struct {
-		obj  *v1.Endpoints
-		port intstr.IntOrString
-		out  v1.EndpointPort
-		ok   bool
+		obj      *v1.Endpoints
+		port     intstr.IntOrString
+		protocol v1.Protocol
+		out      v1.EndpointPort
+		ok       bool
 	}{
 		"endpoints-nil": {
-			obj:  nil,
-			port: intstr.FromInt(80),
-			out:  v1.EndpointPort{},
-			ok:   false,
+			obj:      nil,
+			port:     intstr.FromInt(80),
+			protocol: v1.ProtocolTCP,
+			out:      v1.EndpointPort{},
+			ok:       false,
 		},
 		"endpoints-empty": {
-			obj:  nil,
-			port: intstr.FromInt(80),
-			out:  v1.EndpointPort{},
-			ok:   false,
+			obj:      nil,
+			port:     intstr.FromInt(80),
+			protocol: v1.ProtocolTCP,
+			out:      v1.EndpointPort{},
+			ok:       false,
 		},
 		"endpoints-no-ports": {
 			obj: &v1.Endpoints{
@@ -39,9 +42,10 @@ func TestGetEndpointsPort(t *testing.T) {
 					},
 				},
 			},
-			port: intstr.FromInt(80),
-			out:  v1.EndpointPort{},
-			ok:   false,
+			port:     intstr.FromInt(80),
+			protocol: v1.ProtocolTCP,
+			out:      v1.EndpointPort{},
+			ok:       false,
 		},
 		"endpoints-no-str-port": {
 			obj: &v1.Endpoints{
@@ -49,24 +53,28 @@ func TestGetEndpointsPort(t *testing.T) {
 					{
 						Ports: []v1.EndpointPort{
 							{
-								Name: "unit-a",
-								Port: 8080,
+								Name:     "unit-a",
+								Port:     8080,
+								Protocol: v1.ProtocolTCP,
 							},
 							{
-								Name: "unit-b",
-								Port: 9090,
+								Name:     "unit-b",
+								Port:     9090,
+								Protocol: v1.ProtocolTCP,
 							},
 						},
 					},
 					{
 						Ports: []v1.EndpointPort{
 							{
-								Name: "unit-c",
-								Port: 8081,
+								Name:     "unit-c",
+								Port:     8081,
+								Protocol: v1.ProtocolTCP,
 							},
 							{
-								Name: "unit-d",
-								Port: 9091,
+								Name:     "unit-d",
+								Port:     9091,
+								Protocol: v1.ProtocolTCP,
 							},
 						},
 					},
@@ -82,32 +90,113 @@ func TestGetEndpointsPort(t *testing.T) {
 					{
 						Ports: []v1.EndpointPort{
 							{
-								Name: "http-a",
-								Port: 8080,
+								Name:     "http-a",
+								Port:     8080,
+								Protocol: v1.ProtocolTCP,
 							},
 							{
-								Name: "unit-b",
-								Port: 9090,
+								Name:     "unit-b",
+								Port:     9090,
+								Protocol: v1.ProtocolTCP,
 							},
 						},
 					},
 					{
 						Ports: []v1.EndpointPort{
 							{
-								Name: "unit-c",
-								Port: 8081,
+								Name:     "unit-c",
+								Port:     8081,
+								Protocol: v1.ProtocolTCP,
 							},
 							{
-								Name: "unit-d",
-								Port: 9091,
+								Name:     "unit-d",
+								Port:     9091,
+								Protocol: v1.ProtocolTCP,
 							},
 						},
 					},
 				},
 			},
-			port: intstr.FromInt(80),
-			out:  v1.EndpointPort{},
-			ok:   false,
+			port:     intstr.FromInt(80),
+			protocol: v1.ProtocolTCP,
+			out:      v1.EndpointPort{},
+			ok:       false,
+		},
+		"endpoints-no-str-port-protocol": {
+			obj: &v1.Endpoints{
+				Subsets: []v1.EndpointSubset{
+					{
+						Ports: []v1.EndpointPort{
+							{
+								Name:     "http",
+								Port:     8080,
+								Protocol: v1.ProtocolUDP,
+							},
+							{
+								Name:     "gprc",
+								Port:     9090,
+								Protocol: v1.ProtocolUDP,
+							},
+						},
+					},
+					{
+						Ports: []v1.EndpointPort{
+							{
+								Name:     "metrics",
+								Port:     8081,
+								Protocol: v1.ProtocolUDP,
+							},
+							{
+								Name:     "pprof",
+								Port:     9091,
+								Protocol: v1.ProtocolUDP,
+							},
+						},
+					},
+				},
+			},
+			port:     intstr.FromString("http"),
+			protocol: v1.ProtocolTCP,
+			out:      v1.EndpointPort{},
+			ok:       false,
+		},
+		"endpoints-no-int-port-protocol": {
+			obj: &v1.Endpoints{
+				Subsets: []v1.EndpointSubset{
+					{
+						Ports: []v1.EndpointPort{
+							{
+								Name:     "http",
+								Port:     8080,
+								Protocol: v1.ProtocolUDP,
+							},
+							{
+								Name:     "grpc",
+								Port:     9090,
+								Protocol: v1.ProtocolUDP,
+							},
+						},
+					},
+					{
+						Ports: []v1.EndpointPort{
+							{
+								Name:     "metrics",
+								Port:     8081,
+								Protocol: v1.ProtocolUDP,
+							},
+							{
+								Name:     "pprof",
+								Port:     9091,
+								Protocol: v1.ProtocolUDP,
+							},
+						},
+					},
+				},
+			},
+			port:     intstr.FromInt(80),
+			protocol: v1.ProtocolTCP,
+			out:      v1.EndpointPort{},
+			ok:       false,
 		},
 		"endpoints-has-str-port": {
 			obj: &v1.Endpoints{
@@ -115,33 +204,39 @@ func TestGetEndpointsPort(t *testing.T) {
 					{
 						Ports: []v1.EndpointPort{
 							{
-								Name: "http",
-								Port: 8080,
+								Name:     "http",
+								Port:     8080,
+								Protocol: v1.ProtocolTCP,
 							},
 							{
-								Name: "grpc",
-								Port: 9090,
+								Name:     "grpc",
+								Port:     9090,
+								Protocol: v1.ProtocolTCP,
 							},
 						},
 					},
 					{
 						Ports: []v1.EndpointPort{
 							{
-								Name: "metrics",
-								Port: 8081,
+								Name:     "metrics",
+								Port:     8081,
+								Protocol: v1.ProtocolTCP,
 							},
 							{
-								Name: "pprof",
-								Port: 9091,
+								Name:     "pprof",
+								Port:     9091,
+								Protocol: v1.ProtocolTCP,
 							},
 						},
 					},
 				},
 			},
-			port: intstr.FromString("pprof"),
+			port:     intstr.FromString("pprof"),
+			protocol: v1.ProtocolTCP,
 			out: v1.EndpointPort{
-				Name: "pprof",
-				Port: 9091,
+				Name:     "pprof",
+				Port:     9091,
+				Protocol: v1.ProtocolTCP,
 			},
 			ok: true,
 		},
@@ -151,38 +246,44 @@ func TestGetEndpointsPort(t *testing.T) {
 					{
 						Ports: []v1.EndpointPort{
 							{
-								Name: "http",
-								Port: 8080,
+								Name:     "http",
+								Port:     8080,
+								Protocol: v1.ProtocolTCP,
 							},
 							{
-								Name: "grpc",
-								Port: 9090,
+								Name:     "grpc",
+								Port:     9090,
+								Protocol: v1.ProtocolTCP,
 							},
 						},
 					},
 					{
 						Ports: []v1.EndpointPort{
 							{
-								Name: "metrics",
-								Port: 8081,
+								Name:     "metrics",
+								Port:     8081,
+								Protocol: v1.ProtocolTCP,
 							},
 							{
-								Name: "pprof",
-								Port: 9091,
+								Name:     "pprof",
+								Port:     9091,
+								Protocol: v1.ProtocolTCP,
 							},
 						},
 					},
 				},
 			},
-			port: intstr.FromInt(9090),
+			port:     intstr.FromInt(9090),
+			protocol: v1.ProtocolTCP,
 			out: v1.EndpointPort{
-				Name: "grpc",
-				Port: 9090,
+				Name:     "grpc",
+				Port:     9090,
+				Protocol: v1.ProtocolTCP,
 			},
 			ok: true,
 		},
 	} {
-		out, ok := GetEndpointsPort(test.obj, test.port)
+		out, ok := GetEndpointsPort(test.obj, test.port, test.protocol)
 		assert.Equalf(t, test.out, out, "test '%s' value mismatch", name)
 		assert.Equalf(t, test.ok, ok, "test '%s' exists mismatch", name)
 	}
@@ -233,22 +334,25 @@ func TestGetSecretCert(t *testing.T) {
 func TestGetServicePort(t *testing.T) {
 	t.Parallel()
 	for name, test := range map[string]struct {
-		obj  *v1.Service
-		port intstr.IntOrString
-		out  v1.ServicePort
-		ok   bool
+		obj      *v1.Service
+		port     intstr.IntOrString
+		protocol v1.Protocol
+		out      v1.ServicePort
+		ok       bool
 	}{
 		"service-nil": {
-			obj:  nil,
-			port: intstr.FromInt(80),
-			out:  v1.ServicePort{},
-			ok:   false,
+			obj:      nil,
+			port:     intstr.FromInt(80),
+			protocol: v1.ProtocolTCP,
+			out:      v1.ServicePort{},
+			ok:       false,
 		},
 		"service-empty": {
-			obj:  &v1.Service{},
-			port: intstr.FromInt(80),
-			out:  v1.ServicePort{},
-			ok:   false,
+			obj:      &v1.Service{},
+			port:     intstr.FromInt(80),
+			protocol: v1.ProtocolTCP,
+			out:      v1.ServicePort{},
+			ok:       false,
 		},
 		"service-no-ports": {
 			obj: &v1.Service{
@@ -256,66 +360,121 @@ func TestGetServicePort(t *testing.T) {
 					Ports: []v1.ServicePort{},
 				},
 			},
-			out: v1.ServicePort{},
-			ok:  false,
+			protocol: v1.ProtocolTCP,
+			out:      v1.ServicePort{},
+			ok:       false,
 		},
 		"service-no-str-port": {
 			obj: &v1.Service{
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{
 						{
-							Name: "unit-a",
-							Port: 8080,
+							Name:     "unit-a",
+							Port:     8080,
+							Protocol: v1.ProtocolTCP,
 						},
 						{
-							Name: "unit-b",
-							Port: 9090,
+							Name:     "unit-b",
+							Port:     9090,
+							Protocol: v1.ProtocolTCP,
 						},
 					},
 				},
 			},
-			port: intstr.FromString("http"),
-			out:  v1.ServicePort{},
-			ok:   false,
+			port:     intstr.FromString("http"),
+			protocol: v1.ProtocolTCP,
+			out:      v1.ServicePort{},
+			ok:       false,
 		},
 		"service-no-int-port": {
 			obj: &v1.Service{
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{
 						{
-							Name: "unit-a",
-							Port: 8080,
+							Name:     "unit-a",
+							Port:     8080,
+							Protocol: v1.ProtocolTCP,
 						},
 						{
-							Name: "unit-b",
-							Port: 9090,
+							Name:     "unit-b",
+							Port:     9090,
+							Protocol: v1.ProtocolTCP,
 						},
 					},
 				},
 			},
-			port: intstr.FromInt(80),
-			out:  v1.ServicePort{},
-			ok:   false,
+			port:     intstr.FromInt(80),
+			protocol: v1.ProtocolTCP,
+			out:      v1.ServicePort{},
+			ok:       false,
+		},
+		"service-no-str-port-protocol": {
+			obj: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
+						{
+							Name:     "http",
+							Port:     8080,
+							Protocol: v1.ProtocolUDP,
+						},
+						{
+							Name:     "grpc",
+							Port:     9090,
+							Protocol: v1.ProtocolUDP,
+						},
+					},
+				},
+			},
+			port:     intstr.FromString("http"),
+			protocol: v1.ProtocolTCP,
+			out:      v1.ServicePort{},
+			ok:       false,
+		},
+		"service-no-int-port-protocol": {
+			obj: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
+						{
+							Name:     "http",
+							Port:     8080,
+							Protocol: v1.ProtocolUDP,
+						},
+						{
+							Name:     "grpc",
+							Port:     9090,
+							Protocol: v1.ProtocolUDP,
+						},
+					},
+				},
+			},
+			port:     intstr.FromInt(8080),
+			protocol: v1.ProtocolTCP,
+			out:      v1.ServicePort{},
+			ok:       false,
 		},
 		"service-has-str-port": {
 			obj: &v1.Service{
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{
 						{
-							Name: "http",
-							Port: 8080,
+							Name:     "http",
+							Port:     8080,
+							Protocol: v1.ProtocolTCP,
 						},
 						{
-							Name: "grpc",
-							Port: 9090,
+							Name:     "grpc",
+							Port:     9090,
+							Protocol: v1.ProtocolTCP,
 						},
 					},
 				},
 			},
-			port: intstr.FromString("http"),
+			port:     intstr.FromString("http"),
+			protocol: v1.ProtocolTCP,
 			out: v1.ServicePort{
-				Name: "http",
-				Port: 8080,
+				Name:     "http",
+				Port:     8080,
+				Protocol: v1.ProtocolTCP,
 			},
 			ok: true,
 		},
@@ -324,25 +483,29 @@ func TestGetServicePort(t *testing.T) {
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{
 						{
-							Name: "http",
-							Port: 8080,
+							Name:     "http",
+							Port:     8080,
+							Protocol: v1.ProtocolTCP,
 						},
 						{
-							Name: "grpc",
-							Port: 9090,
+							Name:     "grpc",
+							Port:     9090,
+							Protocol: v1.ProtocolTCP,
 						},
 					},
 				},
 			},
-			port: intstr.FromInt(9090),
+			port:     intstr.FromInt(9090),
+			protocol: v1.ProtocolTCP,
 			out: v1.ServicePort{
-				Name: "grpc",
-				Port: 9090,
+				Name:     "grpc",
+				Port:     9090,
+				Protocol: v1.ProtocolTCP,
 			},
 			ok: true,
 		},
 	} {
-		out, ok := GetServicePort(test.obj, test.port)
+		out, ok := GetServicePort(test.obj, test.port, test.protocol)
 		assert.Equalf(t, test.out, out, "test '%s' value mismatch", name)
 		assert.Equalf(t, test.ok, ok, "test '%s' exists mismatch", name)
 	}

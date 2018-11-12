@@ -818,9 +818,10 @@ func TestGetVerifiedPort(t *testing.T) {
 								Spec: v1.ServiceSpec{
 									Ports: []v1.ServicePort{
 										{
-											Name:     "port-a",
-											Port:     8080,
-											Protocol: v1.ProtocolTCP,
+											Name:       "port-a",
+											Port:       8080,
+											TargetPort: intstr.FromInt(8080),
+											Protocol:   v1.ProtocolTCP,
 										},
 									},
 								},
@@ -839,7 +840,7 @@ func TestGetVerifiedPort(t *testing.T) {
 			port:   intstr.FromInt(8080),
 			out:    0,
 			exists: false,
-			err:    fmt.Errorf("endpoints 'unit/svc-a' missing subsets"),
+			err:    fmt.Errorf("endpoints 'unit/svc-a' missing subsets for port '8080'"),
 		},
 		"service-endpoints-okay": {
 			tr: &syncTranslator{

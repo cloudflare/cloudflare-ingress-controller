@@ -6,6 +6,7 @@ import (
 
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -931,4 +932,21 @@ func newMockedSyncTranslator() *syncTranslator {
 			return r
 		}(),
 	}
+}
+
+type mockTranslator struct {
+	mock.Mock
+}
+
+func (t *mockTranslator) handleResource(kind, key string) error {
+	args := t.Called(kind, key)
+	return args.Error(0)
+}
+func (t *mockTranslator) waitForCacheSync(stopCh <-chan struct{}) bool {
+	args := t.Called(stopCh)
+	return args.Get(0).(bool)
+}
+func (t *mockTranslator) run(stopCh <-chan struct{}) error {
+	args := t.Called(stopCh)
+	return args.Error(0)
 }

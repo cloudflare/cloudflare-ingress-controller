@@ -3,8 +3,10 @@ package argotunnel
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -395,4 +397,49 @@ func TestSplitKindMetaKey(t *testing.T) {
 		assert.Equalf(t, test.meta, meta, "test '%s' meta mismatch", name)
 		assert.Equalf(t, test.err, err, "test '%s' error mismatch", name)
 	}
+}
+
+type mockQueue struct {
+	mock.Mock
+}
+
+func (q *mockQueue) Add(item interface{}) {
+	q.Called(item)
+	return
+}
+func (q *mockQueue) Len() int {
+	args := q.Called()
+	return args.Get(0).(int)
+}
+func (q *mockQueue) Get() (interface{}, bool) {
+	args := q.Called()
+	return args.Get(0).(interface{}), args.Get(1).(bool)
+}
+func (q *mockQueue) Done(item interface{}) {
+	q.Called(item)
+	return
+}
+func (q *mockQueue) ShutDown() {
+	q.Called()
+	return
+}
+func (q *mockQueue) ShuttingDown() bool {
+	args := q.Called()
+	return args.Get(0).(bool)
+}
+func (q *mockQueue) AddAfter(item interface{}, duration time.Duration) {
+	q.Called(item, duration)
+	return
+}
+func (q *mockQueue) AddRateLimited(item interface{}) {
+	q.Called(item)
+	return
+}
+func (q *mockQueue) Forget(item interface{}) {
+	q.Called(item)
+	return
+}
+func (q *mockQueue) NumRequeues(item interface{}) int {
+	args := q.Called(item)
+	return args.Get(0).(int)
 }

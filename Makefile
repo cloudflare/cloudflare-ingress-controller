@@ -75,7 +75,7 @@ $(JOBS): job-%: push-%
 .PHONY: dep
 dep:
 	@echo ensure dependencies
-	@dep ensure -vendor-only -v
+	@go mod download
 
 .PHONY: fmt
 fmt:  

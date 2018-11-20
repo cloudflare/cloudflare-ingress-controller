@@ -1,10 +1,8 @@
-package controller
+package argotunnel
 
 import (
 	"strconv"
 	"time"
-
-	"github.com/cloudflare/cloudflare-ingress-controller/internal/tunnel"
 
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -22,28 +20,28 @@ const (
 	annotationIngressRetries            = "argo.cloudflare.com/retries"
 )
 
-func parseIngressTunnelOptions(ing *v1beta1.Ingress) (opts []tunnel.Option) {
+func parseIngressTunnelOptions(ing *v1beta1.Ingress) (opts []tunnelOption) {
 	if ingMeta, err := meta.Accessor(ing); err == nil {
 		if val, ok := parseMetaUint64(ingMeta, annotationIngressCompressionQuality); ok {
-			opts = append(opts, tunnel.CompressionQuality(val))
+			opts = append(opts, compressionQuality(val))
 		}
 		if val, ok := parseMetaInt(ingMeta, annotationIngressHAConnections); ok {
-			opts = append(opts, tunnel.HaConnections(val))
+			opts = append(opts, haConnections(val))
 		}
 		if val, ok := parseMetaUint64(ingMeta, annotationIngressHeartbeatCount); ok {
-			opts = append(opts, tunnel.HeartbeatCount(val))
+			opts = append(opts, heartbeatCount(val))
 		}
 		if val, ok := parseMetaDuration(ingMeta, annotationIngressHeartbeatInterval); ok {
-			opts = append(opts, tunnel.HeartbeatInterval(val))
+			opts = append(opts, heartbeatInterval(val))
 		}
 		if val, ok := ingMeta.GetAnnotations()[annotationIngressLoadBalancer]; ok {
-			opts = append(opts, tunnel.LbPool(val))
+			opts = append(opts, lbPool(val))
 		}
 		if val, ok := parseMetaBool(ingMeta, annotationIngressNoChunkedEncoding); ok {
-			opts = append(opts, tunnel.DisableChunkedEncoding(val))
+			opts = append(opts, disableChunkedEncoding(val))
 		}
 		if val, ok := parseMetaUint(ingMeta, annotationIngressRetries); ok {
-			opts = append(opts, tunnel.Retries(val))
+			opts = append(opts, retries(val))
 		}
 	}
 	return

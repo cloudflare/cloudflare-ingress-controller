@@ -9,3 +9,13 @@ install:
 
 script:
   - make check
+
+notifications:
+  email:
+    recipients:
+    - malberts@cloudflare.com
+    on_success: never
+    on_failure: change
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

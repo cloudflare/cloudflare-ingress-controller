@@ -1,4 +1,4 @@
-package tunnel
+package argotunnel
 
 import (
 	"sync"
@@ -7,7 +7,7 @@ import (
 	"github.com/cloudflare/cloudflared/origin"
 )
 
-// todo: Review the metrics pattern used by cloudflared and
+// TODO: Review the metrics pattern used by cloudflared and
 // migrate towards go-kit metrics with configurable providers.
 var metricsConfig = struct {
 	metrics         *origin.TunnelMetrics

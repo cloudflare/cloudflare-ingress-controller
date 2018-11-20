@@ -29,4 +29,4 @@
 [[constraint]]
 name = "github.com/cloudflare/cloudflared"
 source = "https://github.com/cloudflare/cloudflared.git"
-revision = "671483a95c23493f63fb554ab9b69ffaf6390149"
+revision = "c85c8526e85871a3e267fa472623c7e1baf63f07"

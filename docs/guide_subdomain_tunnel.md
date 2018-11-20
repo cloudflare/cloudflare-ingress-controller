@@ -29,9 +29,8 @@ awk '/BEGIN.*TUNNEL/{mark=1}/END.*TUNNEL/{print;mark=0}mark' ~/.cloudflared/cert
 ### Step 3: Deploy the Tunnel Secret
 ```bash
 kubectl create secret generic subdomain.mydomain.com --from-file="cert.pem"
-kubectl label secret subdomain.mydomain.com "cloudflare-argo/domain=subdomain.mydomain.com"
 ```
-> Create the secret in the same namespace as the controller deployment.
+> Create the secret in the same namespace as the service deployment.
 > Adjust `subdomain.mydomain.com` to match your Cloudflare domain.
 
 ### Step 4: Attach a Tunnel

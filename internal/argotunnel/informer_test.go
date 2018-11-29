@@ -35,11 +35,49 @@ func TestIngressSecretIndexFunc(t *testing.T) {
 			out: []string{},
 			err: fmt.Errorf("index unexpected obj type: %T", &unit{}),
 		},
+		"obj-ing-class-mismatch": {
+			obj: &v1beta1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "unit",
+					Namespace: "unit",
+					Annotations: map[string]string{
+						"kubernetes.io/ingress.class": "not-unit",
+					},
+				},
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Ingress",
+					APIVersion: "v1beta1",
+				},
+				Spec: v1beta1.IngressSpec{
+					TLS: []v1beta1.IngressTLS{
+						{
+							Hosts: []string{
+								"a.unit.com",
+							},
+							SecretName: "sec-a",
+						},
+					},
+					Rules: []v1beta1.IngressRule{
+						{
+							Host: "a.unit.com",
+							IngressRuleValue: v1beta1.IngressRuleValue{
+								HTTP: &v1beta1.HTTPIngressRuleValue{},
+							},
+						},
+					},
+				},
+			},
+			out: nil,
+			err: nil,
+		},
 		"obj-ing-secs": {
 			obj: &v1beta1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "unit",
 					Namespace: "unit",
+					Annotations: map[string]string{
+						"kubernetes.io/ingress.class": "unit",
+					},
 				},
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Ingress",
@@ -101,7 +139,7 @@ func TestIngressSecretIndexFunc(t *testing.T) {
 			err: nil,
 		},
 	} {
-		indexFunc := ingressSecretIndexFunc(nil)
+		indexFunc := ingressSecretIndexFunc("unit", nil)
 		out, err := indexFunc(test.obj)
 		assert.Equalf(t, test.out, out, "test '%s' index mismatch", name)
 		assert.Equalf(t, test.err, err, "test '%s' error mismatch", name)
@@ -130,11 +168,50 @@ func TestIngressServiceIndexFunc(t *testing.T) {
 			out: []string{},
 			err: fmt.Errorf("index unexpected obj type: %T", &unit{}),
 		},
+		"obj-ing-class-mismatch": {
+			obj: &v1beta1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "unit",
+					Namespace: "unit",
+					Annotations: map[string]string{
+						"kubernetes.io/ingress.class": "not-unit",
+					},
+				},
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Ingress",
+					APIVersion: "v1beta1",
+				},
+				Spec: v1beta1.IngressSpec{
+					Rules: []v1beta1.IngressRule{
+						{
+							Host: "a.unit.com",
+							IngressRuleValue: v1beta1.IngressRuleValue{
+								HTTP: &v1beta1.HTTPIngressRuleValue{
+									Paths: []v1beta1.HTTPIngressPath{
+										{
+											Backend: v1beta1.IngressBackend{
+												ServiceName: "svc-a",
+												ServicePort: intstr.FromString("http"),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			out: nil,
+			err: nil,
+		},
 		"obj-ing-svcs": {
 			obj: &v1beta1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "unit",
 					Namespace: "unit",
+					Annotations: map[string]string{
+						"kubernetes.io/ingress.class": "unit",
+					},
 				},
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Ingress",
@@ -208,7 +285,7 @@ func TestIngressServiceIndexFunc(t *testing.T) {
 			err: nil,
 		},
 	} {
-		indexFunc := ingressServiceIndexFunc()
+		indexFunc := ingressServiceIndexFunc("unit")
 		out, err := indexFunc(test.obj)
 		assert.Equalf(t, test.out, out, "test '%s' index mismatch", name)
 		assert.Equalf(t, test.err, err, "test '%s' error mismatch", name)

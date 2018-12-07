@@ -43,7 +43,7 @@ func main() {
 	incluster := couple.Flag("incluster", "use in-cluster configuration.").Bool()
 	kubeconfig := couple.Flag("kubeconfig", "path to kubeconfig (if not in running inside a cluster)").Default(filepath.Join(os.Getenv("HOME"), ".kube", "config")).String()
 	ingressclass := couple.Flag("ingress-class", "ingress class name").Default(argotunnel.IngressClassDefault).String()
-	originsecret := k8s.ObjMixin(couple.Flag("default-origin-secret", "default origin certificate secret <namespace>/<name>"))
+	originsecrets := k8s.ObjMixin(couple.Flag("default-origin-secret", "default origin certificate secret <namespace>/<name>"))
 	debugaddr := couple.Flag("debug-address", "profiling bind address").Default("127.0.0.1:8081").String()
 	debugenable := couple.Flag("debug-enable", "enable profiling handler").Bool()
 	metricsaddr := couple.Flag("metrics-address", "metrics bind address").Default("0.0.0.0:8080").String()
@@ -158,12 +158,19 @@ func main() {
 			argotunnel.EnableMetrics(5 * time.Second)
 			argotunnel.SetVersion(version)
 
-			ctx, cancel := context.WithCancel(context.Background())
-			argo := argotunnel.NewController(kclient, log,
+			options := []argotunnel.Option{
 				argotunnel.IngressClass(*ingressclass),
-				argotunnel.Secret(originsecret.Name, originsecret.Namespace),
 				argotunnel.ResyncPeriod(*resyncperiod),
 				argotunnel.Workers(*workers),
+			}
+
+			for _, obj := range *originsecrets {
+				options = append(options, argotunnel.Secret(obj.Name, obj.Namespace))
+			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			argo := argotunnel.NewController(kclient, log,
+				options...,
 			)
 
 			g.Add(func() error {

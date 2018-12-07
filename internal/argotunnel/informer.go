@@ -58,7 +58,7 @@ func newEndpointInformer(client kubernetes.Interface, opts options, rs ...cache.
 func newIngressInformer(client kubernetes.Interface, opts options, rs ...cache.ResourceEventHandler) cache.SharedIndexInformer {
 	i := newInformer(client.ExtensionsV1beta1().RESTClient(), "ingresses", new(v1beta1.Ingress), opts.resyncPeriod, rs...)
 	i.AddIndexers(cache.Indexers{
-		secretKind:  ingressSecretIndexFunc(opts.ingressClass, opts.secret),
+		secretKind:  ingressSecretIndexFunc(opts.ingressClass, opts.secrets),
 		serviceKind: ingressServiceIndexFunc(opts.ingressClass),
 	})
 	return i
@@ -83,7 +83,7 @@ func newInformer(c cache.Getter, resource string, objType runtime.Object, resync
 	return sw
 }
 
-func ingressSecretIndexFunc(ingressClass string, secret *resource) func(obj interface{}) ([]string, error) {
+func ingressSecretIndexFunc(ingressClass string, secrets []resource) func(obj interface{}) ([]string, error) {
 	return func(obj interface{}) ([]string, error) {
 		if ing, ok := obj.(*v1beta1.Ingress); ok {
 			var idx []string
@@ -103,8 +103,10 @@ func ingressSecretIndexFunc(ingressClass string, secret *resource) func(obj inte
 					if rule.HTTP != nil && len(rule.Host) > 0 {
 						if r, ok := hostsecret[rule.Host]; ok {
 							idx = append(idx, itemKeyFunc(r.namespace, r.name))
-						} else if secret != nil {
-							idx = append(idx, itemKeyFunc(secret.namespace, secret.name))
+						} else {
+							for _, secret := range secrets {
+								idx = append(idx, itemKeyFunc(secret.namespace, secret.name))
+							}
 						}
 					}
 				}

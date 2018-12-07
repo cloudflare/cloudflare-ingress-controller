@@ -22,7 +22,7 @@ type options struct {
 	ingressClass string
 	resyncPeriod time.Duration
 	requeueLimit int
-	secret       *resource
+	secrets      []resource
 	workers      int
 }
 
@@ -54,10 +54,10 @@ func RequeueLimit(i int) Option {
 func Secret(name, namespace string) Option {
 	return func(o *options) {
 		if len(name) > 0 && len(namespace) > 0 {
-			o.secret = &resource{
+			o.secrets = append(o.secrets, resource{
 				name:      name,
 				namespace: namespace,
-			}
+			})
 		}
 	}
 }
@@ -76,6 +76,7 @@ func collectOptions(opts []Option) options {
 		resyncPeriod: ResyncPeriodDefault,
 		requeueLimit: RequeueLimitDefault,
 		workers:      WorkersDefault,
+		secrets:      []resource{},
 	}
 	// overlay values
 	for _, opt := range opts {

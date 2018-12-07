@@ -185,10 +185,14 @@ func (t *syncTranslator) getRouteFromIngress(ing *v1beta1.Ingress) (r *tunnelRou
 		secret := func() *resource {
 			if r, ok := hostsecret[rule.Host]; ok {
 				return r
-			} else if t.options.secret != nil {
-				return t.options.secret
 			}
-			return nil
+
+			secret, err := t.findVerifiedCertSecret(t.options.secrets, host)
+			if err != nil {
+				return nil
+			}
+
+			return &secret
 		}()
 
 		// secret
@@ -258,7 +262,7 @@ func (t *syncTranslator) getRouteFromIngress(ing *v1beta1.Ingress) (r *tunnelRou
 	return
 }
 
-func (t *syncTranslator) getVerifiedCert(namespace, name, host string) (cert []byte, exists bool, err error) {
+func (t *syncTranslator) getCert(namespace, name string) (cert []byte, exists bool, err error) {
 	key := itemKeyFunc(namespace, name)
 	obj, exists, err := t.informers.secret.GetIndexer().GetByKey(key)
 	if err != nil {
@@ -271,6 +275,37 @@ func (t *syncTranslator) getVerifiedCert(namespace, name, host string) (cert []b
 	cert, exists = k8s.GetSecretCert(obj.(*v1.Secret))
 	if !exists {
 		err = fmt.Errorf("secret '%s' missing 'cert.pem'", key)
+		return
+	}
+
+	return
+}
+
+func (t *syncTranslator) findVerifiedCertSecret(candidates []resource, host string) (resource, error) {
+	for _, secret := range candidates {
+
+		cert, exists, _ := t.getCert(secret.namespace, secret.name)
+		if !exists {
+			continue
+		}
+
+		err := verifyCertForHost(cert, host)
+		if err == nil {
+			return secret, nil
+		}
+	}
+
+	return resource{}, fmt.Errorf("cert not found for host '%s'", host)
+}
+
+func (t *syncTranslator) getVerifiedCert(namespace, name, host string) (cert []byte, exists bool, err error) {
+	cert, exists, err = t.getCert(namespace, name)
+	if err != nil {
+		return
+	}
+
+	if !exists {
+		err = fmt.Errorf("secret '%s/%s' missing 'cert.pem'", namespace, name)
 		return
 	}
 

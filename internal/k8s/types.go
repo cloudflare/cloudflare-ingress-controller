@@ -24,7 +24,7 @@ type Obj struct {
 }
 
 // ObjValue is a meta namespace key variant implementing the Value interface
-type ObjValue Obj
+type ObjValue []Obj
 
 // Set values the object from a string or errors.
 func (o *ObjValue) Set(val string) error {
@@ -37,14 +37,24 @@ func (o *ObjValue) Set(val string) error {
 		} else if parts[1] == "" {
 			return fmt.Errorf("expected '<namespace>/<name>' got '%s'", val)
 		}
-		o.Namespace, o.Name = parts[0], parts[1]
+		*o = append(*o, Obj{Namespace: parts[0], Name: parts[1]})
 	}
 	return nil
 }
 
 func (o *ObjValue) String() (val string) {
-	if o.Namespace != "" && o.Name != "" {
-		val = o.Namespace + objDelim + o.Name
+	for i, obj := range *o {
+		if obj.Namespace != "" && obj.Name != "" {
+			val += fmt.Sprintf("%v%v%v", obj.Namespace, objDelim, obj.Name)
+		}
+
+		if i != len(*o)-1 {
+			val += ", "
+		}
 	}
 	return
+}
+
+func (o *ObjValue) IsCumulative() bool {
+	return true
 }

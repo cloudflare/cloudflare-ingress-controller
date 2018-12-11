@@ -212,7 +212,7 @@ func (t *syncTranslator) getRouteFromIngress(ing *v1beta1.Ingress) (r *tunnelRou
 
 		for _, path := range rule.HTTP.Paths {
 			// ingress
-			if len(path.Path) > 0 {
+			if len(path.Path) > 0 && path.Path != "/" {
 				t.log.Warnf("translator path routing not supported on ingress: %s, host: %s, path: %+v", ingkey, host, path)
 				continue
 			}

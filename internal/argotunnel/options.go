@@ -19,11 +19,12 @@ const (
 )
 
 type options struct {
-	ingressClass string
-	resyncPeriod time.Duration
-	requeueLimit int
-	secret       *resource
-	workers      int
+	ingressClass   string
+	resyncPeriod   time.Duration
+	requeueLimit   int
+	secret         *resource
+	watchNamespace string
+	workers        int
 }
 
 // Option provides behavior overrides
@@ -59,6 +60,13 @@ func Secret(name, namespace string) Option {
 				namespace: namespace,
 			}
 		}
+	}
+}
+
+// WatchNamespace restricts Ingress, Secret, and Service monitoring
+func WatchNamespace(s string) Option {
+	return func(o *options) {
+		o.watchNamespace = s
 	}
 }
 

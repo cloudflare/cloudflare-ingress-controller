@@ -23,6 +23,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/netutil"
 	"gopkg.in/alecthomas/kingpin.v2"
+	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -50,6 +51,7 @@ func main() {
 	metricsenable := couple.Flag("metrics-enable", "enable metrics handler").Bool()
 	connlimit := couple.Flag("connection-limit", "profiling bind address").Default("512").Int()
 	resyncperiod := couple.Flag("resync-period", "period between synchronization attempts").Default(argotunnel.ResyncPeriodDefault.String()).Duration()
+	watchNamespace := couple.Flag("watch-namespace", "restrict resource watches to namespace").Default(v1.NamespaceAll).String()
 	workers := couple.Flag("workers", "number of workers processing updates").Default(strconv.Itoa(argotunnel.WorkersDefault)).Int()
 
 	args := os.Args[1:]
@@ -163,6 +165,7 @@ func main() {
 				argotunnel.IngressClass(*ingressclass),
 				argotunnel.Secret(originsecret.Name, originsecret.Namespace),
 				argotunnel.ResyncPeriod(*resyncperiod),
+				argotunnel.WatchNamespace(*watchNamespace),
 				argotunnel.Workers(*workers),
 			)
 

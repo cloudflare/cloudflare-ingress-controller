@@ -52,11 +52,11 @@ func (i *informerset) waitForCacheSync(stopCh <-chan struct{}) bool {
 }
 
 func newEndpointInformer(client kubernetes.Interface, opts options, rs ...cache.ResourceEventHandler) cache.SharedIndexInformer {
-	return newInformer(client.CoreV1().RESTClient(), "endpoints", new(v1.Endpoints), opts.resyncPeriod, rs...)
+	return newInformer(client.CoreV1().RESTClient(), opts.watchNamespace, "endpoints", new(v1.Endpoints), opts.resyncPeriod, rs...)
 }
 
 func newIngressInformer(client kubernetes.Interface, opts options, rs ...cache.ResourceEventHandler) cache.SharedIndexInformer {
-	i := newInformer(client.ExtensionsV1beta1().RESTClient(), "ingresses", new(v1beta1.Ingress), opts.resyncPeriod, rs...)
+	i := newInformer(client.ExtensionsV1beta1().RESTClient(), opts.watchNamespace, "ingresses", new(v1beta1.Ingress), opts.resyncPeriod, rs...)
 	i.AddIndexers(cache.Indexers{
 		secretKind:  ingressSecretIndexFunc(opts.ingressClass, opts.secret),
 		serviceKind: ingressServiceIndexFunc(opts.ingressClass),
@@ -65,15 +65,15 @@ func newIngressInformer(client kubernetes.Interface, opts options, rs ...cache.R
 }
 
 func newSecretInformer(client kubernetes.Interface, opts options, rs ...cache.ResourceEventHandler) cache.SharedIndexInformer {
-	return newInformer(client.CoreV1().RESTClient(), "secrets", new(v1.Secret), opts.resyncPeriod, rs...)
+	return newInformer(client.CoreV1().RESTClient(), opts.watchNamespace, "secrets", new(v1.Secret), opts.resyncPeriod, rs...)
 }
 
 func newServiceInformer(client kubernetes.Interface, opts options, rs ...cache.ResourceEventHandler) cache.SharedIndexInformer {
-	return newInformer(client.CoreV1().RESTClient(), "services", new(v1.Service), opts.resyncPeriod, rs...)
+	return newInformer(client.CoreV1().RESTClient(), opts.watchNamespace, "services", new(v1.Service), opts.resyncPeriod, rs...)
 }
 
-func newInformer(c cache.Getter, resource string, objType runtime.Object, resyncPeriod time.Duration, rs ...cache.ResourceEventHandler) cache.SharedIndexInformer {
-	lw := cache.NewListWatchFromClient(c, resource, v1.NamespaceAll, fields.Everything())
+func newInformer(c cache.Getter, namespace string, resource string, objType runtime.Object, resyncPeriod time.Duration, rs ...cache.ResourceEventHandler) cache.SharedIndexInformer {
+	lw := cache.NewListWatchFromClient(c, resource, namespace, fields.Everything())
 	sw := cache.NewSharedIndexInformer(lw, objType, resyncPeriod, cache.Indexers{
 		//cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
 	})

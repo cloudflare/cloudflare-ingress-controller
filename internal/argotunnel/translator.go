@@ -197,7 +197,7 @@ func (t *syncTranslator) getRouteFromIngress(ing *v1beta1.Ingress) (r *tunnelRou
 			var err error
 			var exists bool
 			if secret == nil {
-				t.log.Warnf("translator secret not defined on ingress: %s, host: %s", ingkey, host)
+				t.log.Errorf("translator secret not defined on ingress: %s, host: %s", ingkey, host)
 				continue
 			}
 			cert, exists, err = t.getVerifiedCert(secret.namespace, secret.name, host)
@@ -205,7 +205,7 @@ func (t *syncTranslator) getRouteFromIngress(ing *v1beta1.Ingress) (r *tunnelRou
 				t.log.Errorf("translator secret issue on ingress: %s, host: %s, err: %v", ingkey, host, err)
 				continue
 			} else if !exists {
-				t.log.Warnf("translator secret missing cert on ingress: %s, host: %s", ingkey, host)
+				t.log.Errorf("translator secret missing cert on ingress: %s, host: %s", ingkey, host)
 				continue
 			}
 		}
@@ -213,11 +213,11 @@ func (t *syncTranslator) getRouteFromIngress(ing *v1beta1.Ingress) (r *tunnelRou
 		for _, path := range rule.HTTP.Paths {
 			// ingress
 			if len(path.Path) > 0 && path.Path != "/" {
-				t.log.Warnf("translator path routing not supported on ingress: %s, host: %s, path: %+v", ingkey, host, path)
+				t.log.Errorf("translator path routing not supported on ingress: %s, host: %s, path: %+v", ingkey, host, path)
 				continue
 			}
 			if len(path.Backend.ServiceName) == 0 {
-				t.log.Warnf("translator service empty on ingress: %s, host: %s, path: %+v", ingkey, host, path)
+				t.log.Errorf("translator service empty on ingress: %s, host: %s, path: %+v", ingkey, host, path)
 				continue
 			}
 
@@ -231,7 +231,7 @@ func (t *syncTranslator) getRouteFromIngress(ing *v1beta1.Ingress) (r *tunnelRou
 					t.log.Errorf("translator service issue on ingress: %s, host: %s, path: %+v, err: %q", ingkey, host, path, err)
 					continue
 				} else if !exists {
-					t.log.Warnf("translator service missing port on ingress: %s, host: %s, path: %+v", ingkey, host, path)
+					t.log.Errorf("translator service missing port on ingress: %s, host: %s, path: %+v", ingkey, host, path)
 					continue
 				}
 			}

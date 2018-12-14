@@ -1,4 +1,4 @@
-FROM golang:1.10.5 AS build
+FROM golang:1.10.6 AS build
 WORKDIR /go/src/github.com/cloudflare/cloudflare-ingress-controller
 
 ARG VERSION="unknown"

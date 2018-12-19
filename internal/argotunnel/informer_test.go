@@ -139,7 +139,7 @@ func TestIngressSecretIndexFunc(t *testing.T) {
 			err: nil,
 		},
 	} {
-		indexFunc := ingressSecretIndexFunc("unit", nil)
+		indexFunc := ingressSecretIndexFunc("unit", nil, nil)
 		out, err := indexFunc(test.obj)
 		assert.Equalf(t, test.out, out, "test '%s' index mismatch", name)
 		assert.Equalf(t, test.err, err, "test '%s' error mismatch", name)

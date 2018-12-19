@@ -29,3 +29,8 @@
 ### Command-Line Options
 - `--default-origin-secret`: the default certificate used to establish tunnels
   - any tunnel that does not specify a secret will use this default.
+- `--origin-secret-config`: the default certificate used for specific hosts
+  - any matching host that does not specify a secret will use this default.
+  - see [origin-secret-config][guide-origin-secret-config]
+
+[guide-origin-secret-config]: ./guide_origin_secret_config.md

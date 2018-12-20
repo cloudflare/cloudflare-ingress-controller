@@ -61,7 +61,7 @@
   revision = "18c9f6c67e3dfc12e0ddaca748d2887f97a7ac28"
 
 [[projects]]
-  digest = "1:ec714ff1eaa558d9b31989bc754dc33f233bde46ff500b4f7b5d597b34c5567a"
+  digest = "1:ead3d7c4027f70910f53d95165bc163a686f4c287e5518297e7478170cf5b5e0"
   name = "github.com/cloudflare/cloudflared"
   packages = [
     "h2mux",
@@ -72,7 +72,7 @@
     "websocket",
   ]
   pruneopts = ""
-  revision = "c85c8526e85871a3e267fa472623c7e1baf63f07"
+  revision = "c69437ba83d1a93be85cbce6d98fc9ad0c6a7d94"
   source = "https://github.com/cloudflare/cloudflared.git"
 
 [[projects]]
@@ -724,6 +724,7 @@
     "github.com/stretchr/testify/mock",
     "golang.org/x/net/netutil",
     "gopkg.in/alecthomas/kingpin.v2",
+    "gopkg.in/yaml.v2",
     "k8s.io/api/core/v1",
     "k8s.io/api/extensions/v1beta1",
     "k8s.io/apimachinery/pkg/api/equality",
@@ -734,6 +735,7 @@
     "k8s.io/apimachinery/pkg/util/intstr",
     "k8s.io/apimachinery/pkg/util/rand",
     "k8s.io/apimachinery/pkg/util/runtime",
+    "k8s.io/apimachinery/pkg/util/validation",
     "k8s.io/apimachinery/pkg/util/wait",
     "k8s.io/client-go/kubernetes",
     "k8s.io/client-go/rest",

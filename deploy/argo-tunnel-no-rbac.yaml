@@ -20,7 +20,7 @@ spec:
         app: argo-tunnel
     spec:
       containers:
-      - image: gcr.io/cloudflare-registry/argo-tunnel:0.6.0
+      - image: gcr.io/cloudflare-registry/argo-tunnel:0.6.2
         imagePullPolicy: Always
         name: argo-tunnel
         command: ["argot", "couple"]

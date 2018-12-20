@@ -185,6 +185,8 @@ func (t *syncTranslator) getRouteFromIngress(ing *v1beta1.Ingress) (r *tunnelRou
 		secret := func() *resource {
 			if r, ok := hostsecret[rule.Host]; ok {
 				return r
+			} else if r, ok := t.options.originSecrets[rule.Host]; ok {
+				return r
 			} else if t.options.secret != nil {
 				return t.options.secret
 			}

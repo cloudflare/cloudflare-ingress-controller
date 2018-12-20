@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudflare/cloudflare-ingress-controller/internal/cloudflare"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -39,14 +40,32 @@ func TestOptions(t *testing.T) {
 				ResyncPeriod(1 * time.Minute),
 				RequeueLimit(-1),
 				Secret("test-secret-name", "test-secret-namespace"),
+				SecretGroups(cloudflare.OriginSecrets{
+					Groups: []cloudflare.OriginSecretGroup{
+						{
+							Hosts: []string{
+								"abc.test.com",
+								"xyz.test.com",
+							},
+							Secret: cloudflare.OriginSecret{
+								Name:      "test-secret-name",
+								Namespace: "test-secret-namespace",
+							},
+						},
+					},
+				}),
 				WatchNamespace("test-watch-namespace"),
 				Workers(2),
 			},
 			out: options{
-				ingressClass:   "test-class",
-				resyncPeriod:   1 * time.Minute,
-				requeueLimit:   -1,
-				secret:         &resource{"test-secret-name", "test-secret-namespace"},
+				ingressClass: "test-class",
+				resyncPeriod: 1 * time.Minute,
+				requeueLimit: -1,
+				secret:       &resource{"test-secret-name", "test-secret-namespace"},
+				originSecrets: map[string]*resource{
+					"abc.test.com": {"test-secret-name", "test-secret-namespace"},
+					"xyz.test.com": {"test-secret-name", "test-secret-namespace"},
+				},
 				watchNamespace: "test-watch-namespace",
 				workers:        2,
 			},

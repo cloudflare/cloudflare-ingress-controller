@@ -2,6 +2,8 @@ package argotunnel
 
 import (
 	"time"
+
+	"github.com/cloudflare/cloudflare-ingress-controller/internal/cloudflare"
 )
 
 const (
@@ -20,6 +22,7 @@ const (
 
 type options struct {
 	ingressClass   string
+	originSecrets  map[string]*resource
 	resyncPeriod   time.Duration
 	requeueLimit   int
 	secret         *resource
@@ -60,6 +63,27 @@ func Secret(name, namespace string) Option {
 				namespace: namespace,
 			}
 		}
+	}
+}
+
+// SecretGroups defines the default secret used by specific origin tunnels
+func SecretGroups(v cloudflare.OriginSecrets) Option {
+	return func(o *options) {
+		o.originSecrets = func() (m map[string]*resource) {
+			if len(v.Groups) > 0 {
+				m = make(map[string]*resource)
+				for _, g := range v.Groups {
+					r := &resource{
+						name:      g.Secret.Name,
+						namespace: g.Secret.Namespace,
+					}
+					for _, h := range g.Hosts {
+						m[h] = r
+					}
+				}
+			}
+			return
+		}()
 	}
 }
 

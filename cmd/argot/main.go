@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/cloudflare/cloudflare-ingress-controller/internal/argotunnel"
+	"github.com/cloudflare/cloudflare-ingress-controller/internal/cloudflare"
 	"github.com/cloudflare/cloudflare-ingress-controller/internal/k8s"
 	"github.com/oklog/run"
 	"github.com/prometheus/client_golang/prometheus"
@@ -45,6 +46,7 @@ func main() {
 	kubeconfig := couple.Flag("kubeconfig", "path to kubeconfig (if not in running inside a cluster)").Default(filepath.Join(os.Getenv("HOME"), ".kube", "config")).String()
 	ingressclass := couple.Flag("ingress-class", "ingress class name").Default(argotunnel.IngressClassDefault).String()
 	originsecret := k8s.ObjMixin(couple.Flag("default-origin-secret", "default origin certificate secret <namespace>/<name>"))
+	originconfig := couple.Flag("origin-secret-config", "host specific origin certificate defaults").String()
 	debugaddr := couple.Flag("debug-address", "profiling bind address").Default("127.0.0.1:8081").String()
 	debugenable := couple.Flag("debug-enable", "enable profiling handler").Bool()
 	metricsaddr := couple.Flag("metrics-address", "metrics bind address").Default("0.0.0.0:8080").String()
@@ -157,6 +159,12 @@ func main() {
 				os.Exit(1)
 			}
 
+			secretgroups, err := originsecrets(*originconfig)
+			if err != nil {
+				log.Fatalf("failed to parse origin secrets: %v", err)
+				os.Exit(1)
+			}
+
 			argotunnel.EnableMetrics(5 * time.Second)
 			argotunnel.SetVersion(version)
 
@@ -164,6 +172,7 @@ func main() {
 			argo := argotunnel.NewController(kclient, log,
 				argotunnel.IngressClass(*ingressclass),
 				argotunnel.Secret(originsecret.Name, originsecret.Namespace),
+				argotunnel.SecretGroups(*secretgroups),
 				argotunnel.ResyncPeriod(*resyncperiod),
 				argotunnel.WatchNamespace(*watchNamespace),
 				argotunnel.Workers(*workers),
@@ -209,4 +218,12 @@ func logruslevel(v int) (l logrus.Level) {
 		l = logrus.PanicLevel
 	}
 	return
+}
+
+// parse origin secrets
+func originsecrets(originsecretspath string) (*cloudflare.OriginSecrets, error) {
+	if len(originsecretspath) > 0 {
+		return cloudflare.ParseOriginSecretsFile(originsecretspath)
+	}
+	return &cloudflare.OriginSecrets{}, nil
 }

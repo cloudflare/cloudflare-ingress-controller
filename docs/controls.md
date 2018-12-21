@@ -32,5 +32,6 @@
 - `--origin-secret-config`: the default certificate used for specific hosts
   - any matching host that does not specify a secret will use this default.
   - see [origin-secret-config][guide-origin-secret-config]
+- `--watch-namespace`: restrict resource watches to a namespace
 
 [guide-origin-secret-config]: ./guide_origin_secret_config.md

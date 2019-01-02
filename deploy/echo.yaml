@@ -53,6 +53,10 @@ metadata:
     ingress: argo-tunnel
   name: echo
 spec:
+  tls:
+  - hosts:
+    - echo.mydomain.com
+    secretName: mydomain.com
   rules:
   - host: echo.mydomain.com
     http:

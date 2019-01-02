@@ -405,7 +405,6 @@ type mockQueue struct {
 
 func (q *mockQueue) Add(item interface{}) {
 	q.Called(item)
-	return
 }
 func (q *mockQueue) Len() int {
 	args := q.Called()
@@ -417,11 +416,9 @@ func (q *mockQueue) Get() (interface{}, bool) {
 }
 func (q *mockQueue) Done(item interface{}) {
 	q.Called(item)
-	return
 }
 func (q *mockQueue) ShutDown() {
 	q.Called()
-	return
 }
 func (q *mockQueue) ShuttingDown() bool {
 	args := q.Called()
@@ -429,15 +426,12 @@ func (q *mockQueue) ShuttingDown() bool {
 }
 func (q *mockQueue) AddAfter(item interface{}, duration time.Duration) {
 	q.Called(item, duration)
-	return
 }
 func (q *mockQueue) AddRateLimited(item interface{}) {
 	q.Called(item)
-	return
 }
 func (q *mockQueue) Forget(item interface{}) {
 	q.Called(item)
-	return
 }
 func (q *mockQueue) NumRequeues(item interface{}) int {
 	args := q.Called(item)

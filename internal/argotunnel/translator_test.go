@@ -165,7 +165,7 @@ func TestHandleByKind(t *testing.T) {
 						i := &mockSharedIndexInformer{}
 						i.On("GetIndexer").Return(func() cache.Indexer {
 							idx := &mockIndexer{}
-							idx.On("ByIndex", "secret", "unit/sec-a").Return(make([]interface{}, 0, 0), fmt.Errorf("short-circuit"))
+							idx.On("ByIndex", "secret", "unit/sec-a").Return(make([]interface{}, 0), fmt.Errorf("short-circuit"))
 							return idx
 						}())
 						return i
@@ -194,7 +194,7 @@ func TestHandleByKind(t *testing.T) {
 						i := &mockSharedIndexInformer{}
 						i.On("GetIndexer").Return(func() cache.Indexer {
 							idx := &mockIndexer{}
-							idx.On("IndexKeys", "secret", "unit/sec-a").Return(make([]string, 0, 0), fmt.Errorf("short-circuit"))
+							idx.On("IndexKeys", "secret", "unit/sec-a").Return(make([]string, 0), fmt.Errorf("short-circuit"))
 							return idx
 						}())
 						return i
@@ -270,7 +270,7 @@ func TestHandleEndpoint(t *testing.T) {
 						i := &mockSharedIndexInformer{}
 						i.On("GetIndexer").Return(func() cache.Indexer {
 							idx := &mockIndexer{}
-							idx.On("ByIndex", "service", "unit/svc-a").Return(make([]interface{}, 0, 0), fmt.Errorf("short-circuit"))
+							idx.On("ByIndex", "service", "unit/svc-a").Return(make([]interface{}, 0), fmt.Errorf("short-circuit"))
 							return idx
 						}())
 						return i
@@ -299,7 +299,7 @@ func TestHandleEndpoint(t *testing.T) {
 						i := &mockSharedIndexInformer{}
 						i.On("GetIndexer").Return(func() cache.Indexer {
 							idx := &mockIndexer{}
-							idx.On("IndexKeys", "service", "unit/svc-a").Return(make([]string, 0, 0), fmt.Errorf("short-circuit"))
+							idx.On("IndexKeys", "service", "unit/svc-a").Return(make([]string, 0), fmt.Errorf("short-circuit"))
 							return idx
 						}())
 						return i

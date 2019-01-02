@@ -38,7 +38,7 @@ build-dir:
 	@mkdir -p $(TMP_DIR)
 
 .PHONY: check
-check: test-race vet fmt staticcheck unused misspell
+check: test-race vet fmt staticcheck misspell
 
 .PHONY: clean
 clean:
@@ -81,11 +81,6 @@ dep:
 fmt:  
 	@echo checking code is formatted
 	@test -z "$(shell gofmt -s -l -d -e $(SRC_DIRS) | tee /dev/stderr)"
-
-.PHONY: helm
-helm:
-	@echo generating helm manifest
-	@helm template --name=$(VERSION) chart/
 
 .PHONY: install
 install:

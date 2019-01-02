@@ -71,6 +71,7 @@ between the Cloudflare receiver and the kubernetes virtual service ip.
 kubectl apply -f deploy/echo.yaml
 ```
 > Adjust the Ingress host `echo.mydomain.com` to match your Cloudflare domain.
+> Adjust the Ingress `tls` section to link the host with a secret.
 
 **Caveats**:
 - routing by path is not supported (`Ingress.spec.rules[*].host.http.paths[*].path`)

@@ -307,9 +307,9 @@ func (t *syncTranslator) getVerifiedPort(namespace, name string, port intstr.Int
 		return
 	}
 
-	_, exists = k8s.GetEndpointsPort(obj.(*v1.Endpoints), svcport.TargetPort, v1.ProtocolTCP)
+	exists = k8s.HasEndpointsAddresses(obj.(*v1.Endpoints))
 	if !exists {
-		err = fmt.Errorf("endpoints '%s' missing subsets for port '%s'", key, svcport.TargetPort.String())
+		err = fmt.Errorf("endpoints '%s' missing subsets for port '%s'", key, port.String())
 		return
 	}
 

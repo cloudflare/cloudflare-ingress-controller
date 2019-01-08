@@ -10,6 +10,18 @@ const (
 	CertPem = "cert.pem"
 )
 
+// HasEndpointsAddresses verifies addresses are available
+func HasEndpointsAddresses(ep *v1.Endpoints) (exists bool) {
+	if ep != nil {
+		for _, subset := range ep.Subsets {
+			if len(subset.Addresses) > 0 {
+				return true
+			}
+		}
+	}
+	return
+}
+
 // GetEndpointsPort extracts the matching endpoints port
 func GetEndpointsPort(ep *v1.Endpoints, port intstr.IntOrString, protocol v1.Protocol) (val v1.EndpointPort, exists bool) {
 	if ep != nil {

@@ -8,6 +8,60 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+func TestHasEndpointsAddresses(t *testing.T) {
+	t.Parallel()
+	for name, test := range map[string]struct {
+		obj *v1.Endpoints
+		ok  bool
+	}{
+		"endpoints-nil": {
+			obj: nil,
+			ok:  false,
+		},
+		"endpoints-empty": {
+			obj: &v1.Endpoints{},
+			ok:  false,
+		},
+		"endpoints-no-addresses": {
+			obj: &v1.Endpoints{
+				Subsets: []v1.EndpointSubset{
+					{
+						Addresses: []v1.EndpointAddress{},
+					},
+					{
+						Addresses: []v1.EndpointAddress{},
+					},
+				},
+			},
+			ok: false,
+		},
+		"endpoints-has-addresses": {
+			obj: &v1.Endpoints{
+				Subsets: []v1.EndpointSubset{
+					{
+						Addresses: []v1.EndpointAddress{},
+					},
+					{
+						Addresses: []v1.EndpointAddress{},
+					},
+					{
+						Addresses: []v1.EndpointAddress{
+							{
+								IP:       "1.1.1.1",
+								Hostname: "unit.com",
+							},
+						},
+					},
+				},
+			},
+			ok: true,
+		},
+	} {
+		ok := HasEndpointsAddresses(test.obj)
+		assert.Equalf(t, test.ok, ok, "test '%s' exists mismatch", name)
+	}
+}
+
 func TestGetEndpointsPort(t *testing.T) {
 	t.Parallel()
 	for name, test := range map[string]struct {
@@ -25,7 +79,7 @@ func TestGetEndpointsPort(t *testing.T) {
 			ok:       false,
 		},
 		"endpoints-empty": {
-			obj:      nil,
+			obj:      &v1.Endpoints{},
 			port:     intstr.FromInt(80),
 			protocol: v1.ProtocolTCP,
 			out:      v1.EndpointPort{},

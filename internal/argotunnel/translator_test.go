@@ -366,11 +366,10 @@ func TestGetRouteFromIngress(t *testing.T) {
 							idx.On("GetByKey", "unit/svc-a").Return(&v1.Endpoints{
 								Subsets: []v1.EndpointSubset{
 									{
-										Ports: []v1.EndpointPort{
+										Addresses: []v1.EndpointAddress{
 											{
-												Name:     "http",
-												Port:     9090,
-												Protocol: v1.ProtocolTCP,
+												IP:       "1.1.1.1",
+												Hostname: "unit.com",
 											},
 										},
 									},
@@ -853,11 +852,10 @@ func TestGetVerifiedPort(t *testing.T) {
 							idx.On("GetByKey", "unit/svc-a").Return(&v1.Endpoints{
 								Subsets: []v1.EndpointSubset{
 									{
-										Ports: []v1.EndpointPort{
+										Addresses: []v1.EndpointAddress{
 											{
-												Name:     "port-a",
-												Port:     9090,
-												Protocol: v1.ProtocolTCP,
+												IP:       "1.1.1.1",
+												Hostname: "unit.com",
 											},
 										},
 									},

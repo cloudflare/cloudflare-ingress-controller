@@ -6,11 +6,8 @@ IMAGE := $(REGISTRY)/$(PROJECT)
 PLATFORMS := \
 	amd64-linux-amd64 \
 	arm64v8-linux-arm64 \
-	ppc64le-linux-ppc64le
-	# ARM, consider supporting 32bit
-	# arm32v6-linux-arm-5
-	# arm32v6-linux-arm-6
-	# arm32v6-linux-arm-7
+	ppc64le-linux-ppc64le \
+	arm32v6-linux-arm-6
 	# x86, consider supporting 32bit
 	# i386-linux-386
 	# QEMU issue, exec failure on apk add

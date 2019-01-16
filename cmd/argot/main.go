@@ -51,6 +51,7 @@ func main() {
 	debugenable := couple.Flag("debug-enable", "enable profiling handler").Bool()
 	metricsaddr := couple.Flag("metrics-address", "metrics bind address").Default("0.0.0.0:8080").String()
 	metricsenable := couple.Flag("metrics-enable", "enable metrics handler").Bool()
+	protologenable := couple.Flag("proto-log-enable", "enable protocol logging").Bool()
 	connlimit := couple.Flag("connection-limit", "profiling bind address").Default("512").Int()
 	resyncperiod := couple.Flag("resync-period", "period between synchronization attempts").Default(argotunnel.ResyncPeriodDefault.String()).Duration()
 	watchNamespace := couple.Flag("watch-namespace", "restrict resource watches to namespace").Default(v1.NamespaceAll).String()
@@ -72,6 +73,12 @@ func main() {
 		log := logrus.StandardLogger()
 		log.SetLevel(logruslevel(*verbose))
 		log.Out = os.Stderr
+
+		if *protologenable {
+			protolog := argotunnel.ProtoLogger()
+			protolog.SetLevel(logruslevel(*verbose))
+			protolog.Out = os.Stderr
+		}
 
 		var g run.Group
 		{

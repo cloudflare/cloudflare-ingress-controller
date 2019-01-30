@@ -112,6 +112,7 @@ func TestTunnelOptions(t *testing.T) {
 				heartbeatInterval(100 * time.Millisecond),
 				lbPool("test-lb"),
 				retries(100),
+				tags("key1=val1"),
 			},
 			out: tunnelOptions{
 				compressionQuality: 8,
@@ -122,6 +123,7 @@ func TestTunnelOptions(t *testing.T) {
 				heartbeatInterval:  100 * time.Millisecond,
 				lbPool:             "test-lb",
 				retries:            100,
+				tags:               "key1=val1",
 			},
 		},
 	} {

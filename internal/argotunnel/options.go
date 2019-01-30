@@ -139,6 +139,7 @@ type tunnelOptions struct {
 	lbPool             string
 	noChunkedEncoding  bool
 	retries            uint
+	tags               string
 }
 
 type tunnelOption func(*tunnelOptions)
@@ -188,6 +189,12 @@ func lbPool(s string) tunnelOption {
 func retries(i uint) tunnelOption {
 	return func(o *tunnelOptions) {
 		o.retries = i
+	}
+}
+
+func tags(s string) tunnelOption {
+	return func(o *tunnelOptions) {
+		o.tags = s
 	}
 }
 

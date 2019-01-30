@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/cloudflare/cloudflared/origin"
+	"github.com/cloudflare/cloudflared/tunnelrpc/pogs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -242,6 +243,75 @@ func TestVerifyCertForHost(t *testing.T) {
 			}
 		}()
 		assert.Equalf(t, test.err, err, "test '%s' error mismatch", name)
+	}
+}
+
+func TestParseTags(t *testing.T) {
+	t.Parallel()
+	for name, test := range map[string]struct {
+		in  string
+		n   int
+		out []pogs.Tag
+	}{
+		"empty": {
+			in:  "",
+			n:   -1,
+			out: []pogs.Tag{},
+		},
+		"with-no-pairs": {
+			in:  "any-other-value",
+			out: []pogs.Tag{},
+			n:   -1,
+		},
+		"with-partial-pairs": {
+			in: "key0=,=val1,,key2=val2,key3=",
+			n:  -1,
+			out: []pogs.Tag{
+				{
+					Name:  "key2",
+					Value: "val2",
+				},
+			},
+		},
+		"with-pairs": {
+			in: "key0=val0,key1=val1,key2=val=,,key3=val3",
+			n:  -1,
+			out: []pogs.Tag{
+				{
+					Name:  "key0",
+					Value: "val0",
+				},
+				{
+					Name:  "key1",
+					Value: "val1",
+				},
+				{
+					Name:  "key2",
+					Value: "val=",
+				},
+				{
+					Name:  "key3",
+					Value: "val3",
+				},
+			},
+		},
+		"with-pairs-cap": {
+			in: "key0=val0,key1=val1,key2=val=,,key3=val3",
+			n:  2,
+			out: []pogs.Tag{
+				{
+					Name:  "key0",
+					Value: "val0",
+				},
+				{
+					Name:  "key1",
+					Value: "val1",
+				},
+			},
+		},
+	} {
+		out := parseTags(test.in, test.n)
+		assert.Equalf(t, test.out, out, "test '%s' value mismatch", name)
 	}
 }
 

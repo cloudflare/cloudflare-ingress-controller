@@ -21,9 +21,10 @@ import (
 )
 
 const (
-	repairDelay      = 20 * time.Millisecond
-	repairJitter     = 1.0
-	tunnelServerName = "cftunnel.com"
+	repairDelay  = 40 * time.Millisecond
+	repairJitter = 1.0
+	tagLimit     = 32
+	serverName   = "cftunnel.com"
 )
 
 type tunnelRoute struct {
@@ -160,7 +161,7 @@ func newLinkTunnelConfig(rule tunnelRule, cert []byte, options tunnelOptions) *o
 		OriginCert: cert,
 		TlsConfig: &tls.Config{
 			RootCAs:    cloudflare.GetCloudflareRootCA(),
-			ServerName: tunnelServerName,
+			ServerName: serverName,
 		},
 		ClientTlsConfig:   httpTransport.TLSClientConfig, // *tls.Config
 		Retries:           options.retries,
@@ -170,7 +171,7 @@ func newLinkTunnelConfig(rule tunnelRule, cert []byte, options tunnelOptions) *o
 		BuildInfo:         origin.GetBuildInfo(),
 		ReportedVersion:   versionConfig.version,
 		LBPool:            options.lbPool,
-		Tags:              []pogs.Tag{},
+		Tags:              parseTags(options.tags, tagLimit),
 		HAConnections:     options.haConnections,
 		HTTPTransport:     httpTransport,
 		Metrics:           metricsConfig.metrics,
@@ -205,6 +206,47 @@ func newLinkHTTPTransport() *http.Transport {
 func getOriginURL(rule tunnelRule) (url string) {
 	url = fmt.Sprintf("%s.%s:%d", rule.service.name, rule.service.namespace, rule.port)
 	return
+}
+
+func parseTags(s string, n int) []pogs.Tag {
+	if len(s) == 0 || n == 0 {
+		return []pogs.Tag{}
+	}
+
+	cap := n
+	if wc := (len(s) + 1) / 4; n < 0 || wc < n {
+		cap = wc
+	}
+	table := make(map[string]string, cap)
+	order := make([]string, 0, cap)
+	for i, j, m, l := 0, 0, 0, len(s); j <= l && m < cap; j++ {
+		if j == l || s[j] == ',' {
+			for k := i; k < j; k++ {
+				if s[k] == '=' {
+					if k-i > 1 && j-k-1 > 1 {
+						key := s[i:k]
+						val := s[k+1 : j]
+						if _, ok := table[key]; !ok {
+							order = append(order, key)
+							m++
+						}
+						table[key] = val
+					}
+					break
+				}
+			}
+			i = j + 1
+		}
+	}
+
+	tags := make([]pogs.Tag, 0, len(order))
+	for _, key := range order {
+		tags = append(tags, pogs.Tag{
+			Name:  key,
+			Value: table[key],
+		})
+	}
+	return tags
 }
 
 func verifyCertForHost(val []byte, host string) (err error) {

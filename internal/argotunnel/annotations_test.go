@@ -132,7 +132,7 @@ func TestParseIngressTunnelOptions(t *testing.T) {
 						annotationIngressLoadBalancer:       "test-lb-pool",
 						annotationIngressNoChunkedEncoding:  "true",
 						annotationIngressRetries:            "8",
-					},
+						annotationIngressTag:                "key1=val1"},
 				},
 			},
 			out: tunnelOptions{
@@ -143,6 +143,7 @@ func TestParseIngressTunnelOptions(t *testing.T) {
 				lbPool:             "test-lb-pool",
 				noChunkedEncoding:  true,
 				retries:            8,
+				tags:               "key1=val1",
 			},
 		},
 	} {

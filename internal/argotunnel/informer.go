@@ -2,6 +2,7 @@ package argotunnel
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -58,7 +59,7 @@ func newEndpointInformer(client kubernetes.Interface, opts options, rs ...cache.
 func newIngressInformer(client kubernetes.Interface, opts options, rs ...cache.ResourceEventHandler) cache.SharedIndexInformer {
 	i := newInformer(client.ExtensionsV1beta1().RESTClient(), opts.watchNamespace, "ingresses", new(v1beta1.Ingress), opts.resyncPeriod, rs...)
 	i.AddIndexers(cache.Indexers{
-		secretKind:  ingressSecretIndexFunc(opts.ingressClass, opts.originSecrets, opts.secret),
+		secretKind:  ingressSecretIndexFunc(opts.ingressClass, opts.originSecrets, opts.domainSecrets, opts.secret),
 		serviceKind: ingressServiceIndexFunc(opts.ingressClass),
 	})
 	return i
@@ -83,7 +84,7 @@ func newInformer(c cache.Getter, namespace string, resource string, objType runt
 	return sw
 }
 
-func ingressSecretIndexFunc(ingressClass string, originSecrets map[string]*resource, secret *resource) func(obj interface{}) ([]string, error) {
+func ingressSecretIndexFunc(ingressClass string, originSecrets map[string]*resource, domainSecrets map[string]*resource, secret *resource) func(obj interface{}) ([]string, error) {
 	return func(obj interface{}) ([]string, error) {
 		if ing, ok := obj.(*v1beta1.Ingress); ok {
 			var idx []string
@@ -104,6 +105,8 @@ func ingressSecretIndexFunc(ingressClass string, originSecrets map[string]*resou
 						if r, ok := hostsecret[rule.Host]; ok {
 							idx = append(idx, itemKeyFunc(r.namespace, r.name))
 						} else if r, ok := originSecrets[rule.Host]; ok {
+							idx = append(idx, itemKeyFunc(r.namespace, r.name))
+						} else if r, ok := getDomainSecret(rule.Host, domainSecrets); ok {
 							idx = append(idx, itemKeyFunc(r.namespace, r.name))
 						} else if secret != nil {
 							idx = append(idx, itemKeyFunc(secret.namespace, secret.name))
@@ -136,6 +139,25 @@ func ingressServiceIndexFunc(ingressClass string) func(obj interface{}) ([]strin
 		}
 		return []string{}, fmt.Errorf("index unexpected obj type: %T", obj)
 	}
+}
+
+func getDomainSecret(host string, domainSecrets map[string]*resource) (r *resource, ok bool) {
+	if len(domainSecrets) > 0 {
+		if domain, exists := parseDomain(host); exists {
+			r, ok = domainSecrets[domain]
+		}
+	}
+	return
+}
+
+// note: this is not a generic network function. it assumes
+// the value has been pre-validated as part of the ingress.
+func parseDomain(host string) (domain string, ok bool) {
+	if i := strings.IndexByte(host, '.'); i > 0 && i+1 < len(host) {
+		domain = host[i+1:]
+		ok = true
+	}
+	return
 }
 
 func itemKeyFunc(namespace, name string) (key string) {

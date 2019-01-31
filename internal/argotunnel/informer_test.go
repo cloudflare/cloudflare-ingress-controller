@@ -139,7 +139,7 @@ func TestIngressSecretIndexFunc(t *testing.T) {
 			err: nil,
 		},
 	} {
-		indexFunc := ingressSecretIndexFunc("unit", nil, nil)
+		indexFunc := ingressSecretIndexFunc("unit", nil, nil, nil)
 		out, err := indexFunc(test.obj)
 		assert.Equalf(t, test.out, out, "test '%s' index mismatch", name)
 		assert.Equalf(t, test.err, err, "test '%s' error mismatch", name)
@@ -289,6 +289,102 @@ func TestIngressServiceIndexFunc(t *testing.T) {
 		out, err := indexFunc(test.obj)
 		assert.Equalf(t, test.out, out, "test '%s' index mismatch", name)
 		assert.Equalf(t, test.err, err, "test '%s' error mismatch", name)
+	}
+}
+
+func TestGetDomainSecret(t *testing.T) {
+	t.Parallel()
+	for name, test := range map[string]struct {
+		host    string
+		secrets map[string]*resource
+		out     *resource
+		ok      bool
+	}{
+		"empty-host": {
+			host: "",
+			secrets: map[string]*resource{
+				"test.com": {
+					name:      "test-a",
+					namespace: "test-a",
+				},
+			},
+			out: nil,
+			ok:  false,
+		},
+		"empty-secrets": {
+			host:    "a.test.com",
+			secrets: nil,
+			out:     nil,
+			ok:      false,
+		},
+		"no-match": {
+			host: "a.unit.com",
+			secrets: map[string]*resource{
+				"test.com": {
+					name:      "test-a",
+					namespace: "test-a",
+				},
+			},
+			out: nil,
+			ok:  false,
+		},
+		"match": {
+			host: "a.test.com",
+			secrets: map[string]*resource{
+				"test.com": {
+					name:      "test-a",
+					namespace: "test-a",
+				},
+			},
+			out: &resource{
+				name:      "test-a",
+				namespace: "test-a",
+			},
+			ok: true,
+		},
+	} {
+		out, ok := getDomainSecret(test.host, test.secrets)
+		assert.Equalf(t, test.out, out, "test '%s' secret mismatch", name)
+		assert.Equalf(t, test.ok, ok, "test '%s' condition mismatch", name)
+	}
+}
+
+func TestParseDomain(t *testing.T) {
+	t.Parallel()
+	for name, test := range map[string]struct {
+		host   string
+		domain string
+		ok     bool
+	}{
+		"empty": {
+			host:   "",
+			domain: "",
+			ok:     false,
+		},
+		"missing-hostname": {
+			host:   ".test.io",
+			domain: "",
+			ok:     false,
+		},
+		"missing-domain": {
+			host:   "a.",
+			domain: "",
+			ok:     false,
+		},
+		"2-part": {
+			host:   "a.test.io",
+			domain: "test.io",
+			ok:     true,
+		},
+		"n-part": {
+			host:   "a.b.c.d.e.test.io",
+			domain: "b.c.d.e.test.io",
+			ok:     true,
+		},
+	} {
+		domain, ok := parseDomain(test.host)
+		assert.Equalf(t, test.domain, domain, "test '%s' domain mismatch", name)
+		assert.Equalf(t, test.ok, ok, "test '%s' condition mismatch", name)
 	}
 }
 

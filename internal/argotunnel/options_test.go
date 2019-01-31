@@ -34,6 +34,31 @@ func TestOptions(t *testing.T) {
 				workers:      WorkersDefault,
 			},
 		},
+		"set-secret-default-from-groups": {
+			in: []Option{
+				Secret("test-secret-name-a", "test-secret-namespace-a"),
+				SecretGroups(cloudflare.OriginSecrets{
+					Groups: []cloudflare.OriginSecretGroup{
+						{
+							Hosts: []string{
+								"*",
+							},
+							Secret: cloudflare.OriginSecret{
+								Name:      "test-secret-name-b",
+								Namespace: "test-secret-namespace-b",
+							},
+						},
+					},
+				}),
+			},
+			out: options{
+				ingressClass: IngressClassDefault,
+				resyncPeriod: ResyncPeriodDefault,
+				requeueLimit: RequeueLimitDefault,
+				secret:       &resource{"test-secret-name-b", "test-secret-namespace-b"},
+				workers:      WorkersDefault,
+			},
+		},
 		"set-all-options": {
 			in: []Option{
 				IngressClass("test-class"),
@@ -46,6 +71,7 @@ func TestOptions(t *testing.T) {
 							Hosts: []string{
 								"abc.test.com",
 								"xyz.test.com",
+								"*.unit.com",
 							},
 							Secret: cloudflare.OriginSecret{
 								Name:      "test-secret-name",
@@ -65,6 +91,9 @@ func TestOptions(t *testing.T) {
 				originSecrets: map[string]*resource{
 					"abc.test.com": {"test-secret-name", "test-secret-namespace"},
 					"xyz.test.com": {"test-secret-name", "test-secret-namespace"},
+				},
+				domainSecrets: map[string]*resource{
+					"unit.com": {"test-secret-name", "test-secret-namespace"},
 				},
 				watchNamespace: "test-watch-namespace",
 				workers:        2,

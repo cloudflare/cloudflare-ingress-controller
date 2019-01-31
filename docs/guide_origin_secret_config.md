@@ -26,7 +26,13 @@ groups:
   secret:
     name: test-b
     namespace: test-b
+- hosts:
+  - "*.test.com"
+  secret:
+    name: test-c
+    namespace: test-c
 ```
-> * wildcard hosts are not allowed
+> * wildcard hosts are allowed
+> * specific hosts take precedence over wildcard hosts
 
 [kubernetes-ingress]: https://kubernetes.io/docs/concepts/services-networking/ingress/

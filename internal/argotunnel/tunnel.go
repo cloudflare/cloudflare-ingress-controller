@@ -21,11 +21,46 @@ import (
 )
 
 const (
-	repairDelay  = 40 * time.Millisecond
-	repairJitter = 1.0
-	tagLimit     = 32
-	serverName   = "cftunnel.com"
+	// RepairDelayDefault the default base time to wait between repairs
+	RepairDelayDefault = 40 * time.Millisecond
+	// RepairJitterDefault the default linear jitter applied to the wait on repair
+	RepairJitterDefault = 1.0
+	// TagLimitDefault the default number of unique tags
+	TagLimitDefault = 32
+
+	serverName = "cftunnel.com"
 )
+
+var repairBackoff = struct {
+	delay     time.Duration
+	jitter    float64
+	setRepair sync.Once
+}{
+	delay:  RepairDelayDefault,
+	jitter: RepairJitterDefault,
+}
+
+// SetRepairBackoff configures the repair backoff used by all tunnels
+func SetRepairBackoff(delay time.Duration, jitter float64) {
+	repairBackoff.setRepair.Do(func() {
+		repairBackoff.delay = delay
+		repairBackoff.jitter = jitter
+	})
+}
+
+var tagConfig = struct {
+	limit  int
+	setTag sync.Once
+}{
+	limit: TagLimitDefault,
+}
+
+// SetTagLimit configures unique tag limit
+func SetTagLimit(limit int) {
+	tagConfig.setTag.Do(func() {
+		tagConfig.limit = limit
+	})
+}
 
 type tunnelRoute struct {
 	name      string
@@ -171,7 +206,7 @@ func newLinkTunnelConfig(rule tunnelRule, cert []byte, options tunnelOptions) *o
 		BuildInfo:         origin.GetBuildInfo(),
 		ReportedVersion:   versionConfig.version,
 		LBPool:            options.lbPool,
-		Tags:              parseTags(options.tags, tagLimit),
+		Tags:              parseTags(options.tags, tagConfig.limit),
 		HAConnections:     options.haConnections,
 		HTTPTransport:     httpTransport,
 		Metrics:           metricsConfig.metrics,
@@ -324,7 +359,7 @@ func repairFunc(l *syncTunnelLink) func() {
 						}).Errorf("link exited with error (%s) '%v', repairing ...", reflect.TypeOf(err), err)
 
 						// linear back-off on runtime error
-						delay := wait.Jitter(repairDelay, repairJitter)
+						delay := wait.Jitter(repairBackoff.delay, repairBackoff.jitter)
 						log.WithFields(logrus.Fields{
 							"origin":   ll.config.OriginUrl,
 							"hostname": ll.rule.host,

@@ -315,6 +315,54 @@ func TestParseTags(t *testing.T) {
 	}
 }
 
+func TestSetRepairBackoff(t *testing.T) {
+	repairDelay := repairBackoff.delay
+	repairJitter := repairBackoff.jitter
+	repairs := []struct {
+		delay  time.Duration
+		jitter float64
+	}{
+		{
+			delay:  1 * time.Millisecond,
+			jitter: 0.5,
+		},
+		{
+			delay:  10 * time.Millisecond,
+			jitter: .25,
+		},
+		{
+			delay:  100 * time.Millisecond,
+			jitter: .125,
+		},
+	}
+
+	for _, r := range repairs {
+		SetRepairBackoff(r.delay, r.jitter)
+	}
+
+	assert.Equalf(t, repairs[0].delay, repairBackoff.delay, "test repair delay matches first set")
+	assert.Equalf(t, repairs[0].jitter, repairBackoff.jitter, "test repair jitter matches first set")
+	assert.NotEqualf(t, repairBackoff.delay, repairDelay, "test repair delay does not match default")
+	assert.NotEqualf(t, repairBackoff.jitter, repairJitter, "test repair jitter does not match default")
+}
+
+func TestSetTagLimit(t *testing.T) {
+	tagLimit := tagConfig.limit
+	limits := []int{
+		128,
+		64,
+		32,
+		16,
+	}
+
+	for _, n := range limits {
+		SetTagLimit(n)
+	}
+
+	assert.Equalf(t, limits[0], tagConfig.limit, "test tag limit matches first set")
+	assert.NotEqualf(t, tagConfig.limit, tagLimit, "test repair delay does not match default")
+}
+
 func genCertforHost(host string) (cert []byte) {
 	template := x509.Certificate{
 		SerialNumber: func() (n *big.Int) {

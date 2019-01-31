@@ -23,8 +23,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/netutil"
-	"gopkg.in/alecthomas/kingpin.v2"
-	"k8s.io/api/core/v1"
+	kingpin "gopkg.in/alecthomas/kingpin.v2"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -53,7 +53,10 @@ func main() {
 	metricsenable := couple.Flag("metrics-enable", "enable metrics handler").Bool()
 	protologenable := couple.Flag("proto-log-enable", "enable protocol logging").Bool()
 	connlimit := couple.Flag("connection-limit", "profiling bind address").Default("512").Int()
+	repairdelay := couple.Flag("repair-delay", "period between tunnel repair attempts").Default(argotunnel.RepairDelayDefault.String()).Duration()
+	repairjitter := couple.Flag("repair-jitter", "linear jitter as a fraction of repair-delay").Default(strconv.FormatFloat(argotunnel.RepairJitterDefault, 'E', -1, 64)).Float64()
 	resyncperiod := couple.Flag("resync-period", "period between synchronization attempts").Default(argotunnel.ResyncPeriodDefault.String()).Duration()
+	taglimit := couple.Flag("tag-limit", "number of tags allowed per tunnel").Default(strconv.Itoa(argotunnel.TagLimitDefault)).Int()
 	watchNamespace := couple.Flag("watch-namespace", "restrict resource watches to namespace").Default(v1.NamespaceAll).String()
 	workers := couple.Flag("workers", "number of workers processing updates").Default(strconv.Itoa(argotunnel.WorkersDefault)).Int()
 
@@ -173,6 +176,8 @@ func main() {
 			}
 
 			argotunnel.EnableMetrics(5 * time.Second)
+			argotunnel.SetRepairBackoff(*repairdelay, *repairjitter)
+			argotunnel.SetTagLimit(*taglimit)
 			argotunnel.SetVersion(version)
 
 			ctx, cancel := context.WithCancel(context.Background())

@@ -18,6 +18,7 @@ const (
 	annotationIngressLoadBalancer       = "argo.cloudflare.com/lb-pool"
 	annotationIngressNoChunkedEncoding  = "argo.cloudflare.com/no-chunked-encoding"
 	annotationIngressRetries            = "argo.cloudflare.com/retries"
+	annotationIngressTag                = "argo.cloudflare.com/tag"
 )
 
 func parseIngressTunnelOptions(ing *v1beta1.Ingress) (opts []tunnelOption) {
@@ -42,6 +43,9 @@ func parseIngressTunnelOptions(ing *v1beta1.Ingress) (opts []tunnelOption) {
 		}
 		if val, ok := parseMetaUint(ingMeta, annotationIngressRetries); ok {
 			opts = append(opts, retries(val))
+		}
+		if val, ok := ingMeta.GetAnnotations()[annotationIngressTag]; ok {
+			opts = append(opts, tags(val))
 		}
 	}
 	return

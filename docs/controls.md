@@ -23,8 +23,13 @@
   - **required** if replicas > 1
 - `argo.cloudflare.com/no-chunked-encoding`: disables chunked transfer encoding; useful if you are running a WSGI server
   - defaults to `"false"`
-- `argo.cloudflare.com/retries`: maximum number of retries for connection/protocol errors.
+- `argo.cloudflare.com/retries`: maximum number of retries for connection/protocol errors
   - defaults to `"3"`
+- `argo.cloudflare.com/tag`: custom tags used to identify the ingress tunnels
+  - defaults to `""`
+  - format `KEY1=VALUE1,KEY2=VALUE2,KEY3=VALUE3`
+  - the system limits tags to 32 unique custom tags
+
 
 ### Command-Line Options
 - `--default-origin-secret`: the default certificate used to establish tunnels

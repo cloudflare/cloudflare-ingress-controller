@@ -1,4 +1,4 @@
-FROM golang:1.10.7 AS build
+FROM golang:1.10.8 AS build
 WORKDIR /go/src/github.com/cloudflare/cloudflare-ingress-controller
 
 RUN go get github.com/golang/dep/cmd/dep

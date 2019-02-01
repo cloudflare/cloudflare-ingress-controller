@@ -37,7 +37,7 @@
 - `--origin-secret-config`: the default certificate used for specific hosts
   - any matching host that does not specify a secret will use this default.
   - see [origin-secret-config][guide-origin-secret-config]
-- `--proto-log-enable`: enable tunnel protocol logging
+- `--transport-log-enable`: enable tunnel transport logging
 - `--v`: set the controller log level
   - defaults to `"3"`
 - `--watch-namespace`: restrict resource watches to a namespace

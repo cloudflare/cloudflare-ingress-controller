@@ -212,7 +212,7 @@ func newLinkTunnelConfig(rule tunnelRule, cert []byte, options tunnelOptions) *o
 		Metrics:           metricsConfig.metrics,
 		MetricsUpdateFreq: metricsConfig.updateFrequency,
 		// todo: alter logger creation to allow easy disable for tests
-		ProtocolLogger:     ProtoLogger(),
+		TransportLogger:    TransportLogger(),
 		Logger:             logrus.StandardLogger(),
 		IsAutoupdated:      false,
 		GracePeriod:        options.gracePeriod,

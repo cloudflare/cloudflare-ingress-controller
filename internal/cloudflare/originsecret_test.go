@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -46,7 +47,7 @@ func TestOriginSecrets(t *testing.T) {
 					{
 						Hosts: []string{
 							"",
-							"*.test.com",
+							"*.*.test.com",
 							"#@!.test.com",
 						},
 						Secret: OriginSecret{
@@ -58,7 +59,7 @@ func TestOriginSecrets(t *testing.T) {
 			},
 			err: []error{
 				fmt.Errorf("group at index 0, host at index 0 must be non-empty"),
-				fmt.Errorf(`group at index 0, host "*.test.com" at index 1 must not contain '*'`),
+				fmt.Errorf(`group at index 0, host "*.*.test.com" at index 1 a wildcard DNS-1123 subdomain must start with '*.', followed by a valid DNS subdomain, which must consist of lower case alphanumeric characters, '-' or '.' and end with an alphanumeric character (e.g. '*.example.com', regex used for validation is '\*\.[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')`),
 				fmt.Errorf(`group at index 0, host "#@!.test.com" at index 2 a DNS-1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')`),
 			},
 		},
@@ -135,6 +136,7 @@ func TestOriginSecrets(t *testing.T) {
 						Hosts: []string{
 							"abc.test.com",
 							"xyz.test.com",
+							"*.test.com",
 						},
 						Secret: OriginSecret{
 							Name:      "test",
@@ -158,6 +160,11 @@ func TestParse(t *testing.T) {
 		out *OriginSecrets
 		err error
 	}{
+		"obj-fail-unmarshal": {
+			in:  "@",
+			out: nil,
+			err: fmt.Errorf(`yaml: found character that cannot start any token`),
+		},
 		"obj-empty": {
 			in:  "",
 			out: &OriginSecrets{},
@@ -166,7 +173,7 @@ func TestParse(t *testing.T) {
 		"obj-parse-error": {
 			in:  errorCerts,
 			out: nil,
-			err: fmt.Errorf(`group at index 1, host "*.test.com" at index 0 must not contain '*'`),
+			err: fmt.Errorf(`group at index 1, host "*.*.test.com" at index 0 a wildcard DNS-1123 subdomain must start with '*.', followed by a valid DNS subdomain, which must consist of lower case alphanumeric characters, '-' or '.' and end with an alphanumeric character (e.g. '*.example.com', regex used for validation is '\*\.[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')`),
 		},
 		"obj-parse-okay": {
 			in: okayCerts,
@@ -188,6 +195,15 @@ func TestParse(t *testing.T) {
 						Secret: OriginSecret{
 							Name:      "test-b",
 							Namespace: "test-b",
+						},
+					},
+					{
+						Hosts: []string{
+							"*.test.com",
+						},
+						Secret: OriginSecret{
+							Name:      "test-c",
+							Namespace: "test-c",
 						},
 					},
 				},
@@ -212,6 +228,12 @@ func TestParseFile(t *testing.T) {
 		out  *OriginSecrets
 		err  error
 	}{
+		"obj-no-access": {
+			file: unitfile{name: "test.yaml", data: []byte(""), mode: 0644},
+			mode: 0000,
+			out:  nil,
+			err:  fmt.Errorf(`open test.yaml: permission denied`),
+		},
 		"obj-parse-empty": {
 			file: unitfile{name: "test.yaml", data: []byte(""), mode: 0644},
 			mode: 0700,
@@ -222,7 +244,7 @@ func TestParseFile(t *testing.T) {
 			file: unitfile{name: "test.yaml", data: []byte(errorCerts), mode: 0644},
 			mode: 0700,
 			out:  nil,
-			err:  fmt.Errorf(`group at index 1, host "*.test.com" at index 0 must not contain '*'`),
+			err:  fmt.Errorf(`group at index 1, host "*.*.test.com" at index 0 a wildcard DNS-1123 subdomain must start with '*.', followed by a valid DNS subdomain, which must consist of lower case alphanumeric characters, '-' or '.' and end with an alphanumeric character (e.g. '*.example.com', regex used for validation is '\*\.[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')`),
 		},
 		"obj-parse-okay": {
 			file: unitfile{name: "test.yaml", data: []byte(okayCerts), mode: 0644},
@@ -247,6 +269,15 @@ func TestParseFile(t *testing.T) {
 							Namespace: "test-b",
 						},
 					},
+					{
+						Hosts: []string{
+							"*.test.com",
+						},
+						Secret: OriginSecret{
+							Name:      "test-c",
+							Namespace: "test-c",
+						},
+					},
 				},
 			},
 			err: nil,
@@ -263,7 +294,8 @@ func TestParseFile(t *testing.T) {
 
 		out, err := ParseOriginSecretsFile(filepath)
 		if err != nil {
-			err = fmt.Errorf("%s", err.Error())
+			s := strings.Replace(err.Error(), filepath, test.file.name, -1)
+			err = fmt.Errorf("%s", s)
 		}
 		assert.Equalf(t, test.out, out, "test '%s' val mismatch", name)
 		assert.Equalf(t, test.err, err, "test '%s' err mismatch", name)
@@ -282,6 +314,11 @@ groups:
   secret:
     name: test-b
     namespace: test-b
+- hosts:
+  - "*.test.com"
+  secret:
+    name: test-c
+    namespace: test-c
 `
 
 const errorCerts = `
@@ -292,7 +329,7 @@ groups:
     name: test-a
     namespace: test-a
 - hosts:
-  - "*.test.com"
+  - "*.*.test.com"
   secret:
     name: test-b
     namespace: test-b

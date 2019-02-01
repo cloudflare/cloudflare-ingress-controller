@@ -83,7 +83,11 @@ func (ocg *OriginSecretGroup) Validate() []error {
 			if len(host) == 0 {
 				errs = append(errs, fmt.Errorf("host at index %d %s", i, validation.EmptyError()))
 			} else if strings.Contains(host, "*") {
-				errs = append(errs, fmt.Errorf("host %q at index %d must not contain '*'", host, i))
+				if host != "*" {
+					for _, msg := range validation.IsWildcardDNS1123Subdomain(host) {
+						errs = append(errs, fmt.Errorf("host %q at index %d %s", host, i, msg))
+					}
+				}
 			} else {
 				for _, msg := range validation.IsDNS1123Subdomain(host) {
 					errs = append(errs, fmt.Errorf("host %q at index %d %s", host, i, msg))

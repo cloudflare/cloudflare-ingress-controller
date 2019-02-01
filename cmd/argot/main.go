@@ -183,8 +183,8 @@ func main() {
 			ctx, cancel := context.WithCancel(context.Background())
 			argo := argotunnel.NewController(kclient, log,
 				argotunnel.IngressClass(*ingressclass),
-				argotunnel.Secret(originsecret.Name, originsecret.Namespace),
 				argotunnel.SecretGroups(*secretgroups),
+				argotunnel.Secret(originsecret.Name, originsecret.Namespace),
 				argotunnel.ResyncPeriod(*resyncperiod),
 				argotunnel.WatchNamespace(*watchNamespace),
 				argotunnel.Workers(*workers),

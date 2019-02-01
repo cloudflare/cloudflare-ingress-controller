@@ -23,6 +23,7 @@ const (
 type options struct {
 	ingressClass   string
 	originSecrets  map[string]*resource
+	domainSecrets  map[string]*resource
 	resyncPeriod   time.Duration
 	requeueLimit   int
 	secret         *resource
@@ -66,24 +67,42 @@ func Secret(name, namespace string) Option {
 	}
 }
 
-// SecretGroups defines the default secret used by specific origin tunnels
+// SecretGroups maps secrets used by specific origin tunnels
 func SecretGroups(v cloudflare.OriginSecrets) Option {
 	return func(o *options) {
-		o.originSecrets = func() (m map[string]*resource) {
+		var secret *resource
+		o.originSecrets, o.domainSecrets, secret = func() (m map[string]*resource, w map[string]*resource, d *resource) {
 			if len(v.Groups) > 0 {
-				m = make(map[string]*resource)
+				// collect hosts into mild and wild groups
+				mild := make(map[string]*resource)
+				wild := make(map[string]*resource)
 				for _, g := range v.Groups {
 					r := &resource{
 						name:      g.Secret.Name,
 						namespace: g.Secret.Namespace,
 					}
 					for _, h := range g.Hosts {
-						m[h] = r
+						if h == "*" {
+							d = r
+						} else if h[0] == '*' {
+							wild[h[2:]] = r
+						} else {
+							mild[h] = r
+						}
 					}
+				}
+				if len(mild) > 0 {
+					m = mild
+				}
+				if len(wild) > 0 {
+					w = wild
 				}
 			}
 			return
 		}()
+		if secret != nil {
+			o.secret = secret
+		}
 	}
 }
 

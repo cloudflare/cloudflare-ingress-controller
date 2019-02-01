@@ -15,6 +15,6 @@ RUN GO_EXTLINK_ENABLED=0 CGO_ENABLED=0 GOOS=linux go build \
     -tags netgo -installsuffix netgo \
     -v github.com/cloudflare/cloudflare-ingress-controller/cmd/argot
 
-FROM alpine:3.8 AS final
+FROM alpine:3.9 AS final
 RUN apk --no-cache add ca-certificates
 COPY --from=build /go/bin/argot /bin/argot

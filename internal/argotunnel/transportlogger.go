@@ -12,8 +12,8 @@ import (
 // and Out in main prior to threaded execution).
 
 var (
-	// protoLogger is the name of the proto logger
-	protoLogger = func() *logrus.Logger {
+	// transportLogger is the name of the TransportLogger
+	transportLogger = func() *logrus.Logger {
 		log := logrus.New()
 		log.SetLevel(logrus.PanicLevel)
 		log.Out = os.Stderr
@@ -21,32 +21,32 @@ var (
 	}()
 )
 
-// ProtoLogger returns the proto logger
-func ProtoLogger() *logrus.Logger {
-	return protoLogger
+// TransportLogger returns the proto logger
+func TransportLogger() *logrus.Logger {
+	return transportLogger
 }
 
 // SetOutput sets the standard logger output.
 func SetOutput(out io.Writer) {
-	protoLogger.Out = out
+	transportLogger.Out = out
 }
 
 // SetFormatter sets the standard logger formatter.
 func SetFormatter(formatter logrus.Formatter) {
-	protoLogger.Formatter = formatter
+	transportLogger.Formatter = formatter
 }
 
 // SetLevel sets the standard logger level.
 func SetLevel(level logrus.Level) {
-	protoLogger.SetLevel(level)
+	transportLogger.SetLevel(level)
 }
 
 // GetLevel returns the standard logger level.
 func GetLevel() logrus.Level {
-	return protoLogger.Level
+	return transportLogger.Level
 }
 
 // AddHook adds a hook to the standard logger hooks.
 func AddHook(hook logrus.Hook) {
-	protoLogger.Hooks.Add(hook)
+	transportLogger.Hooks.Add(hook)
 }

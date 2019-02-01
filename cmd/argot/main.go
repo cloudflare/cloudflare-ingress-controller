@@ -51,12 +51,12 @@ func main() {
 	debugenable := couple.Flag("debug-enable", "enable profiling handler").Bool()
 	metricsaddr := couple.Flag("metrics-address", "metrics bind address").Default("0.0.0.0:8080").String()
 	metricsenable := couple.Flag("metrics-enable", "enable metrics handler").Bool()
-	protologenable := couple.Flag("proto-log-enable", "enable protocol logging").Bool()
 	connlimit := couple.Flag("connection-limit", "profiling bind address").Default("512").Int()
 	repairdelay := couple.Flag("repair-delay", "period between tunnel repair attempts").Default(argotunnel.RepairDelayDefault.String()).Duration()
 	repairjitter := couple.Flag("repair-jitter", "linear jitter as a fraction of repair-delay").Default(strconv.FormatFloat(argotunnel.RepairJitterDefault, 'E', -1, 64)).Float64()
 	resyncperiod := couple.Flag("resync-period", "period between synchronization attempts").Default(argotunnel.ResyncPeriodDefault.String()).Duration()
 	taglimit := couple.Flag("tag-limit", "number of tags allowed per tunnel").Default(strconv.Itoa(argotunnel.TagLimitDefault)).Int()
+	transportlogenable := couple.Flag("transport-log-enable", "enable transport logging").Bool()
 	watchNamespace := couple.Flag("watch-namespace", "restrict resource watches to namespace").Default(v1.NamespaceAll).String()
 	workers := couple.Flag("workers", "number of workers processing updates").Default(strconv.Itoa(argotunnel.WorkersDefault)).Int()
 
@@ -77,10 +77,10 @@ func main() {
 		log.SetLevel(logruslevel(*verbose))
 		log.Out = os.Stderr
 
-		if *protologenable {
-			protolog := argotunnel.ProtoLogger()
-			protolog.SetLevel(logruslevel(*verbose))
-			protolog.Out = os.Stderr
+		if *transportlogenable {
+			transportlog := argotunnel.TransportLogger()
+			transportlog.SetLevel(logruslevel(*verbose))
+			transportlog.Out = os.Stderr
 		}
 
 		var g run.Group

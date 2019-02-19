@@ -4,6 +4,7 @@ WORKDIR /go/src/github.com/cloudflare/cloudflare-ingress-controller
 RUN go get github.com/golang/dep/cmd/dep
 COPY Gopkg.toml Gopkg.lock ./
 RUN dep ensure -v -vendor-only
+COPY hack/tunnel.gosrc vendor/github.com/cloudflare/cloudflared/origin/tunnel.go
 
 COPY cmd cmd
 COPY internal internal

@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"reflect"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -329,7 +330,12 @@ func launchFunc(l *syncTunnelLink) func() {
 		// Process the panic into an error on errCh to trigger tunnel repair.
 		defer func() {
 			if r := recover(); r != nil {
-				e := fmt.Errorf("origin daemon run time panic: %v", r)
+				e := fmt.Errorf("origin daemon runtime panic: %v", r)
+				l.log.WithFields(logrus.Fields{
+					"origin":   l.config.OriginUrl,
+					"hostname": l.rule.host,
+					"trace":    debug.Stack(),
+				}).Errorf("origin daemon runtime panic: %v", r)
 				errCh <- e
 			}
 		}()

@@ -12,9 +12,8 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
-
-	"golang.org/x/sync/errgroup"
 
 	"github.com/cloudflare/cloudflared/h2mux"
 	"github.com/cloudflare/cloudflared/tunnelrpc"
@@ -27,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	_ "github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	rpc "zombiezen.com/go/capnproto2/rpc"
 )
 
@@ -65,6 +65,7 @@ type TunnelConfig struct {
 	WSGI               bool
 	CompressionQuality uint64
 	IncidentLookup     IncidentLookup
+	CloseConnOnce      *sync.Once // Used to close connectedSignal no more than once
 }
 
 type dialError struct {
@@ -162,11 +163,10 @@ func ServeTunnelLoop(ctx context.Context,
 	config.Metrics.incrementHaConnections()
 	defer config.Metrics.decrementHaConnections()
 	backoff := BackoffHandler{MaxRetries: config.Retries}
-	// Used to close connectedSignal no more than once
 	connectedFuse := h2mux.NewBooleanFuse()
 	go func() {
 		if connectedFuse.Await() {
-			close(connectedSignal)
+			config.CloseConnOnce.Do(func() { close(connectedSignal) })
 		}
 	}()
 	// Ensure the above goroutine will terminate if we return without connecting
@@ -196,8 +196,8 @@ func ServeTunnel(
 	// Treat panics as recoverable errors
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("tunnel: %v", r)
 			recoverable = true
+			err = fmt.Errorf("tunnel: %v", r)
 			config.Logger.WithFields(log.Fields{
 				"trace": debug.Stack(),
 			}).Errorf("tunnel runtime panic: %v", r)
@@ -351,13 +351,9 @@ func RegisterTunnel(
 	for _, logLine := range registration.LogLines {
 		config.Logger.Info(logLine)
 	}
-	if registration.Err == DuplicateConnectionError {
-		return dupConnRegisterTunnelError{}
-	} else if registration.Err != "" {
-		return serverRegisterTunnelError{
-			cause:     fmt.Errorf("Server error: %s", registration.Err),
-			permanent: registration.PermanentFailure,
-		}
+
+	if regErr := processRegisterTunnelError(registration.Err, registration.PermanentFailure, config.Metrics); regErr != nil {
+		return regErr
 	}
 
 	if registration.TunnelID != "" {
@@ -379,6 +375,22 @@ func RegisterTunnel(
 
 	config.Logger.Infof("Route propagating, it may take up to 1 minute for your new route to become functional")
 	return nil
+}
+
+func processRegisterTunnelError(err string, permanentFailure bool, metrics *TunnelMetrics) error {
+	if err == "" {
+		metrics.regSuccess.Inc()
+		return nil
+	}
+
+	metrics.regFail.WithLabelValues(err).Inc()
+	if err == DuplicateConnectionError {
+		return dupConnRegisterTunnelError{}
+	}
+	return serverRegisterTunnelError{
+		cause:     fmt.Errorf("Server error: %s", err),
+		permanent: permanentFailure,
+	}
 }
 
 func UnregisterTunnel(muxer *h2mux.Muxer, gracePeriod time.Duration, logger *log.Logger) error {

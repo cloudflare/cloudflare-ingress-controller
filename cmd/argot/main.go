@@ -54,6 +54,7 @@ func main() {
 	connlimit := couple.Flag("connection-limit", "profiling bind address").Default("512").Int()
 	repairdelay := couple.Flag("repair-delay", "period between tunnel repair attempts").Default(argotunnel.RepairDelayDefault.String()).Duration()
 	repairjitter := couple.Flag("repair-jitter", "linear jitter as a fraction of repair-delay").Default(strconv.FormatFloat(argotunnel.RepairJitterDefault, 'E', -1, 64)).Float64()
+	repairsteps := couple.Flag("repair-steps", "number of exponential steps used during tunnel repair").Default(strconv.FormatUint(argotunnel.RepairStepsDefault, 10)).Uint()
 	resyncperiod := couple.Flag("resync-period", "period between synchronization attempts").Default(argotunnel.ResyncPeriodDefault.String()).Duration()
 	taglimit := couple.Flag("tag-limit", "number of tags allowed per tunnel").Default(strconv.Itoa(argotunnel.TagLimitDefault)).Int()
 	transportlogenable := couple.Flag("transport-log-enable", "enable transport logging").Bool()
@@ -176,7 +177,7 @@ func main() {
 			}
 
 			argotunnel.EnableMetrics(5 * time.Second)
-			argotunnel.SetRepairBackoff(*repairdelay, *repairjitter)
+			argotunnel.SetRepairBackoff(*repairdelay, *repairjitter, *repairsteps)
 			argotunnel.SetTagLimit(*taglimit)
 			argotunnel.SetVersion(version)
 

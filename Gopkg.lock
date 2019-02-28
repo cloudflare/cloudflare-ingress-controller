@@ -61,7 +61,7 @@
   revision = "18c9f6c67e3dfc12e0ddaca748d2887f97a7ac28"
 
 [[projects]]
-  digest = "1:9eab2746570148b0d87d1cdb851485154a570d4c613bd44ece8310ab87c700df"
+  digest = "1:4d402ed7ec712753bbd0779a56f030cb2016f43884c63e788f294c5f35e44f98"
   name = "github.com/cloudflare/cloudflared"
   packages = [
     "h2mux",
@@ -72,7 +72,7 @@
     "websocket",
   ]
   pruneopts = ""
-  revision = "99713e3439a276b88ca3d9bceb032f5e6919624a"
+  revision = "4586ed3e514f745cd010404c858f3c4018f2222a"
   source = "https://github.com/cloudflare/cloudflared.git"
 
 [[projects]]

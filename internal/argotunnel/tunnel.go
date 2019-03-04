@@ -402,6 +402,9 @@ func repairFunc(l *syncTunnelLink) func() {
 
 						close(ll.stopCh)
 						ll.config.ClientID = utilrand.String(32)
+						// reset config runtime state during repair.
+						ll.config.IncidentLookup = origin.NewIncidentLookup()
+						ll.config.CloseConnOnce = &sync.Once{}
 						ll.stopCh = make(chan struct{})
 						ll.repiars++
 						go launchFunc(ll)()

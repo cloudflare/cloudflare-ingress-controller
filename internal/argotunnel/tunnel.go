@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"math/rand"
 	"net"
 	"net/http"
 	"reflect"
@@ -17,15 +18,16 @@ import (
 	"github.com/cloudflare/cloudflared/origin"
 	"github.com/cloudflare/cloudflared/tunnelrpc/pogs"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/apimachinery/pkg/util/wait"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 )
 
 const (
 	// RepairDelayDefault the default base time to wait between repairs
-	RepairDelayDefault = 40 * time.Millisecond
+	RepairDelayDefault = 100 * time.Millisecond
 	// RepairJitterDefault the default linear jitter applied to the wait on repair
-	RepairJitterDefault = 1.0
+	RepairJitterDefault = 0.5
+	// RepairStepsDefault the default exponential steps used during repair
+	RepairStepsDefault = 4
 	// TagLimitDefault the default number of unique tags
 	TagLimitDefault = 32
 
@@ -35,17 +37,20 @@ const (
 var repairBackoff = struct {
 	delay     time.Duration
 	jitter    float64
+	steps     uint
 	setRepair sync.Once
 }{
 	delay:  RepairDelayDefault,
 	jitter: RepairJitterDefault,
+	steps:  RepairStepsDefault,
 }
 
 // SetRepairBackoff configures the repair backoff used by all tunnels
-func SetRepairBackoff(delay time.Duration, jitter float64) {
+func SetRepairBackoff(delay time.Duration, jitter float64, steps uint) {
 	repairBackoff.setRepair.Do(func() {
 		repairBackoff.delay = delay
 		repairBackoff.jitter = jitter
+		repairBackoff.steps = steps
 	})
 }
 
@@ -90,15 +95,16 @@ type tunnelLink interface {
 }
 
 type syncTunnelLink struct {
-	mu     sync.RWMutex
-	rule   tunnelRule
-	cert   []byte
-	opts   tunnelOptions
-	config *origin.TunnelConfig
-	errCh  chan error
-	quitCh chan struct{}
-	stopCh chan struct{}
-	log    *logrus.Logger
+	mu      sync.RWMutex
+	rule    tunnelRule
+	cert    []byte
+	opts    tunnelOptions
+	config  *origin.TunnelConfig
+	errCh   chan error
+	quitCh  chan struct{}
+	stopCh  chan struct{}
+	repiars uint
+	log     *logrus.Logger
 }
 
 func (l *syncTunnelLink) host() string {
@@ -203,7 +209,7 @@ func newLinkTunnelConfig(rule tunnelRule, cert []byte, options tunnelOptions) *o
 		Retries:           options.retries,
 		HeartbeatInterval: options.heartbeatInterval,
 		MaxHeartbeats:     options.heartbeatCount,
-		ClientID:          rand.String(32),
+		ClientID:          utilrand.String(32),
 		BuildInfo:         origin.GetBuildInfo(),
 		ReportedVersion:   versionConfig.version,
 		LBPool:            options.lbPool,
@@ -220,6 +226,8 @@ func newLinkTunnelConfig(rule tunnelRule, cert []byte, options tunnelOptions) *o
 		RunFromTerminal:    false, // bool
 		NoChunkedEncoding:  options.noChunkedEncoding,
 		CompressionQuality: options.compressionQuality,
+		IncidentLookup:     origin.NewIncidentLookup(),
+		CloseConnOnce:      &sync.Once{},
 	}
 }
 
@@ -365,7 +373,7 @@ func repairFunc(l *syncTunnelLink) func() {
 						}).Errorf("link exited with error (%s) '%v', repairing ...", reflect.TypeOf(err), err)
 
 						// linear back-off on runtime error
-						delay := wait.Jitter(repairBackoff.delay, repairBackoff.jitter)
+						delay := repairDelay(ll.repiars, repairBackoff.delay, repairBackoff.jitter, repairBackoff.steps)
 						log.WithFields(logrus.Fields{
 							"origin":   ll.config.OriginUrl,
 							"hostname": ll.rule.host,
@@ -393,12 +401,24 @@ func repairFunc(l *syncTunnelLink) func() {
 						}
 
 						close(ll.stopCh)
-						ll.config.ClientID = rand.String(32)
+						ll.config.ClientID = utilrand.String(32)
 						ll.stopCh = make(chan struct{})
+						ll.repiars++
 						go launchFunc(ll)()
 					}()
 				}
 			}
 		}
 	}
+}
+
+func repairDelay(step uint, delay time.Duration, jitter float64, steps uint) time.Duration {
+	d := delay
+	if steps > 0 {
+		d = (1 << (step % steps)) * delay
+	}
+	if jitter > 0 {
+		d += time.Duration(rand.Float64() * jitter * float64(delay))
+	}
+	return d
 }

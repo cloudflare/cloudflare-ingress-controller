@@ -318,32 +318,89 @@ func TestParseTags(t *testing.T) {
 func TestSetRepairBackoff(t *testing.T) {
 	repairDelay := repairBackoff.delay
 	repairJitter := repairBackoff.jitter
+	repairSteps := repairBackoff.steps
 	repairs := []struct {
 		delay  time.Duration
 		jitter float64
+		steps  uint
 	}{
 		{
 			delay:  1 * time.Millisecond,
-			jitter: 0.5,
+			jitter: 0.25,
+			steps:  1,
 		},
 		{
 			delay:  10 * time.Millisecond,
-			jitter: .25,
+			jitter: .125,
+			steps:  2,
 		},
 		{
 			delay:  100 * time.Millisecond,
-			jitter: .125,
+			jitter: .0625,
+			steps:  3,
 		},
 	}
 
 	for _, r := range repairs {
-		SetRepairBackoff(r.delay, r.jitter)
+		SetRepairBackoff(r.delay, r.jitter, r.steps)
 	}
 
 	assert.Equalf(t, repairs[0].delay, repairBackoff.delay, "test repair delay matches first set")
 	assert.Equalf(t, repairs[0].jitter, repairBackoff.jitter, "test repair jitter matches first set")
+	assert.Equalf(t, repairs[0].steps, repairBackoff.steps, "test repair steps matches first set")
 	assert.NotEqualf(t, repairBackoff.delay, repairDelay, "test repair delay does not match default")
 	assert.NotEqualf(t, repairBackoff.jitter, repairJitter, "test repair jitter does not match default")
+	assert.NotEqualf(t, repairBackoff.steps, repairSteps, "test repair steps does not match default")
+}
+
+func TestRepairDelay(t *testing.T) {
+	t.Parallel()
+	for name, test := range map[string]struct {
+		step   uint
+		delay  time.Duration
+		jitter float64
+		steps  uint
+		out    time.Duration
+	}{
+		"step-0-no-jitter": {
+			step:   0,
+			delay:  10 * time.Millisecond,
+			jitter: 0.0,
+			steps:  4,
+			out:    10 * time.Millisecond,
+		},
+		"step-0-no-jitter-no-steps": {
+			step:   0,
+			delay:  10 * time.Millisecond,
+			jitter: 0.0,
+			steps:  0,
+			out:    10 * time.Millisecond,
+		},
+		"step-1-no-jitter": {
+			step:   1,
+			delay:  10 * time.Millisecond,
+			jitter: 0.0,
+			steps:  4,
+			out:    20 * time.Millisecond,
+		},
+		"step-2-no-jitter": {
+			step:   2,
+			delay:  10 * time.Millisecond,
+			jitter: 0.0,
+			steps:  4,
+			out:    40 * time.Millisecond,
+		},
+		"step-4-no-jitter": {
+			step:   4,
+			delay:  10 * time.Millisecond,
+			jitter: 0.0,
+			steps:  4,
+			out:    10 * time.Millisecond,
+		},
+	} {
+		out := repairDelay(test.step, test.delay, test.jitter, test.steps)
+		assert.Equalf(t, test.out, out, "test '%s' value mismatch", name)
+	}
 }
 
 func TestSetTagLimit(t *testing.T) {

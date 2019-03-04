@@ -197,7 +197,7 @@ func ServeTunnel(
 	defer func() {
 		if r := recover(); r != nil {
 			config.Logger.WithFields(log.Fields{
-				"trace": debug.Stack(),
+				"trace": string(debug.Stack()),
 			}).Errorf("tunnel runtime panic: %v", r)
 			err = fmt.Errorf("tunnel: %v", r)
 			recoverable = true

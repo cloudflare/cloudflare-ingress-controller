@@ -226,7 +226,8 @@ func newLinkTunnelConfig(rule tunnelRule, cert []byte, options tunnelOptions) *o
 		RunFromTerminal:    false, // bool
 		NoChunkedEncoding:  options.noChunkedEncoding,
 		CompressionQuality: options.compressionQuality,
-		CloseConnOnce: &sync.Once{},
+		IncidentLookup:     origin.NewIncidentLookup(),
+		CloseConnOnce:      &sync.Once{},
 	}
 }
 
